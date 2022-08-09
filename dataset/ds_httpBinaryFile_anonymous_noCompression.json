@@ -1,0 +1,37 @@
+{
+	"name": "ds_httpBinaryFile_anonymous_noCompression",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "ls_http_anonymous",
+			"type": "LinkedServiceReference",
+			"parameters": {
+				"par_baseUrl": {
+					"value": "@dataset().par_baseUrl",
+					"type": "Expression"
+				}
+			}
+		},
+		"parameters": {
+			"par_baseUrl": {
+				"type": "string"
+			},
+			"par_relativeUrl": {
+				"type": "string"
+			}
+		},
+		"folder": {
+			"name": "HTTP"
+		},
+		"annotations": [],
+		"type": "Binary",
+		"typeProperties": {
+			"location": {
+				"type": "HttpServerLocation",
+				"relativeUrl": {
+					"value": "@dataset().par_relativeUrl",
+					"type": "Expression"
+				}
+			}
+		}
+	}
+}
