@@ -1,10 +1,18 @@
 {
 	"name": "ls_adls",
+	"type": "Microsoft.DataFactory/factories/linkedservices",
 	"properties": {
+		"parameters": {
+			"par_accountname": {
+				"type": "string",
+				"defaultValue": "sthvinboundamisamdevl"
+			}
+		},
 		"annotations": [],
 		"type": "AzureBlobFS",
 		"typeProperties": {
-			"url": "https://workshopinboundsa.dfs.core.windows.net/"
-		}
+			"url": "@{concat('https://',linkedService().par_accountname,'.dfs.core.windows.net')}"
+		},
+		"description": "Linked service for Azure Data Lake Storage Gen2 which takes the ADLS2 accountname as a parameter."
 	}
 }
