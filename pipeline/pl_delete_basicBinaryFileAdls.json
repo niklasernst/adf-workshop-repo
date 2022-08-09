@@ -1,0 +1,180 @@
+{
+	"name": "pl_delete_basicBinaryFileAdls",
+	"properties": {
+		"activities": [
+			{
+				"name": "executePipeline_writeErrorLog",
+				"description": "Pass error information to pl_writeLogToQueue and execute it.",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "delete_binaryFileAdls",
+						"dependencyConditions": [
+							"Failed"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"waitOnCompletion": false,
+					"parameters": {
+						"par_logType": "Error",
+						"par_logId": {
+							"value": "@activity('delete_binaryFileAdls').Error.errorCode",
+							"type": "Expression"
+						},
+						"par_logMessage": {
+							"value": "@activity('delete_binaryFileAdls').Error.message",
+							"type": "Expression"
+						},
+						"par_jobName": {
+							"value": "@pipeline().Pipeline",
+							"type": "Expression"
+						},
+						"par_jobId": {
+							"value": "@pipeline().parameters.par_jobId",
+							"type": "Expression"
+						},
+						"par_jobRunId": {
+							"value": "@pipeline().RunId",
+							"type": "Expression"
+						},
+						"par_groupId": {
+							"value": "@pipeline().GroupId",
+							"type": "Expression"
+						},
+						"par_triggerId": {
+							"value": "@pipeline().TriggerId",
+							"type": "Expression"
+						},
+						"par_triggerName": {
+							"value": "@pipeline().TriggerName",
+							"type": "Expression"
+						},
+						"par_triggerTime": {
+							"value": "@pipeline().TriggerTime",
+							"type": "Expression"
+						},
+						"par_parentJobRunId": {
+							"value": "@pipeline()?.TriggeredByPipelineRunId",
+							"type": "Expression"
+						},
+						"par_impact": {
+							"value": "@pipeline().parameters.par_impact",
+							"type": "Expression"
+						},
+						"par_urgency": {
+							"value": "@pipeline().parameters.par_urgency",
+							"type": "Expression"
+						},
+						"par_ticketTitle": {
+							"value": "@pipeline().parameters.par_ticketTitle",
+							"type": "Expression"
+						},
+						"par_ticketDescription": {
+							"value": "@concat(pipeline().parameters.par_ticketDescription,' Error message: ',activity('delete_binaryFileAdls').Error.message)",
+							"type": "Expression"
+						},
+						"par_recipientLeanIxId": {
+							"value": "@pipeline().parameters.par_recipientLeanIxId",
+							"type": "Expression"
+						},
+						"par_businessSupportGroup": {
+							"value": "@pipeline().parameters.par_businessSupportGroup",
+							"type": "Expression"
+						},
+						"par_technicalSupportGroup": {
+							"value": "@pipeline().parameters.par_technicalSupportGroup",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "delete_binaryFileAdls",
+				"type": "Delete",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.01:00:00",
+					"retry": 1,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"dataset": {
+						"referenceName": "ds_adlsBinaryFile",
+						"type": "DatasetReference",
+						"parameters": {
+							"par_storageAccount": {
+								"value": "@pipeline().parameters.par_storageAccount",
+								"type": "Expression"
+							},
+							"par_container": {
+								"value": "@pipeline().parameters.par_container",
+								"type": "Expression"
+							},
+							"par_directory": {
+								"value": "@pipeline().parameters.par_directory",
+								"type": "Expression"
+							},
+							"par_filename": {
+								"value": "@pipeline().parameters.par_filename",
+								"type": "Expression"
+							}
+						}
+					},
+					"enableLogging": false,
+					"storeSettings": {
+						"type": "AzureBlobFSReadSettings",
+						"recursive": true,
+						"enablePartitionDiscovery": false
+					}
+				}
+			}
+		],
+		"parameters": {
+			"par_jobId": {
+				"type": "string"
+			},
+			"par_storageAccount": {
+				"type": "string"
+			},
+			"par_container": {
+				"type": "string"
+			},
+			"par_directory": {
+				"type": "string"
+			},
+			"par_filename": {
+				"type": "string"
+			},
+			"par_impact": {
+				"type": "string"
+			},
+			"par_urgency": {
+				"type": "string"
+			},
+			"par_ticketTitle": {
+				"type": "string"
+			},
+			"par_ticketDescription": {
+				"type": "string"
+			},
+			"par_recipientLeanIxId": {
+				"type": "string"
+			},
+			"par_businessSupportGroup": {
+				"type": "string"
+			},
+			"par_technicalSupportGroup": {
+				"type": "string"
+			}
+		},
+		"folder": {
+			"name": "4_Shared/Deleting"
+		},
+		"annotations": []
+	}
+}
