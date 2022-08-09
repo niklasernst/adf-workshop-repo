@@ -1,0 +1,741 @@
+{
+	"name": "pl_validateFileSchema",
+	"properties": {
+		"description": "Ths pipeline may be called to validate the soure file of a copy activity by comparing it to schema of a comparison file specified by the metadadta of the job.",
+		"activities": [
+			{
+				"name": "lookup_obtainJsonConfigFile",
+				"description": "Looks up json config files to obtain job parameters.",
+				"type": "Lookup",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.01:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "JsonSource",
+						"storeSettings": {
+							"type": "AzureBlobFSReadSettings",
+							"recursive": true,
+							"enablePartitionDiscovery": false
+						},
+						"formatSettings": {
+							"type": "JsonReadSettings"
+						}
+					},
+					"dataset": {
+						"referenceName": "ds_adlsJsonFile",
+						"type": "DatasetReference",
+						"parameters": {
+							"par_storageAccount": {
+								"value": "@concat(pipeline().globalParameters.par_metadataStorageAccountName,pipeline().globalParameters.par_environment)",
+								"type": "Expression"
+							},
+							"par_container": {
+								"value": "@pipeline().globalParameters.par_jobmetadataStorageAccountContainer",
+								"type": "Expression"
+							},
+							"par_directory": {
+								"value": "@toLower(pipeline().globalParameters.par_dataflowConfigStorageAccountDirectory)",
+								"type": "Expression"
+							},
+							"par_fileName": {
+								"value": "@concat(pipeline().parameters.par_jobId,'.json')",
+								"type": "Expression"
+							},
+							"par_encoding": "Default(UTF-8)"
+						}
+					}
+				}
+			},
+			{
+				"name": "executePipeline_writeErrorLog1",
+				"description": "Pass error information to pl_writeLogToQueue and execute it.",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "lookup_obtainJsonConfigFile",
+						"dependencyConditions": [
+							"Failed"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"waitOnCompletion": false,
+					"parameters": {
+						"par_logType": "Error",
+						"par_logId": {
+							"value": "@activity('lookup_obtainJsonConfigFile').Error.errorCode",
+							"type": "Expression"
+						},
+						"par_logMessage": {
+							"value": "@activity('lookup_obtainJsonConfigFile').Error.message",
+							"type": "Expression"
+						},
+						"par_jobName": {
+							"value": "@pipeline().Pipeline",
+							"type": "Expression"
+						},
+						"par_jobId": {
+							"value": "@pipeline().parameters.par_jobId",
+							"type": "Expression"
+						},
+						"par_jobRunId": {
+							"value": "@pipeline().RunId",
+							"type": "Expression"
+						},
+						"par_groupId": {
+							"value": "@pipeline().GroupId",
+							"type": "Expression"
+						},
+						"par_triggerId": {
+							"value": "@pipeline().TriggerId",
+							"type": "Expression"
+						},
+						"par_triggerName": {
+							"value": "@pipeline().TriggerName",
+							"type": "Expression"
+						},
+						"par_triggerTime": {
+							"value": "@pipeline().TriggerTime",
+							"type": "Expression"
+						},
+						"par_parentJobRunId": {
+							"value": "@pipeline()?.TriggeredByPipelineRunId",
+							"type": "Expression"
+						},
+						"par_impact": "3",
+						"par_urgency": "3",
+						"par_ticketTitle": "Reading JSON config file is not working.",
+						"par_ticketDescription": {
+							"value": "@concat('Reading of JSON config file from metadata storage account is not working. Please resolve issue as soon as possible. Error message: ',activity('lookup_obtainJsonConfigFile').Error.message)",
+							"type": "Expression"
+						},
+						"par_recipientLeanIxId": "null",
+						"par_businessSupportGroup": "null",
+						"par_technicalSupportGroup": "null"
+					}
+				}
+			},
+			{
+				"name": "switch_uponFileType",
+				"type": "Switch",
+				"dependsOn": [
+					{
+						"activity": "setVar_fileType",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"on": {
+						"value": "@variables('var_fileType')",
+						"type": "Expression"
+					},
+					"cases": [
+						{
+							"value": "csv or txt",
+							"activities": [
+								{
+									"name": "getMetadata_ofCsvFileToValidate",
+									"type": "GetMetadata",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "0.01:00:00",
+										"retry": 3,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"dataset": {
+											"referenceName": "ds_adlsCsvFile",
+											"type": "DatasetReference",
+											"parameters": {
+												"par_storageAccount": {
+													"value": "@concat(if(pipeline().parameters.par_isSourceFile,activity('lookup_obtainJsonConfigFile').output.firstRow.adlsSource.storageAccount,activity('lookup_obtainJsonConfigFile').output.firstRow.adlsTarget.storageAccount),pipeline().globalParameters.par_environment)",
+													"type": "Expression"
+												},
+												"par_container": {
+													"value": "@if(pipeline().parameters.par_isSourceFile,activity('lookup_obtainJsonConfigFile').output.firstRow.adlsSource.container,activity('lookup_obtainJsonConfigFile').output.firstRow.adlsTarget.container)",
+													"type": "Expression"
+												},
+												"par_directory": {
+													"value": "@toLower(if(pipeline().parameters.par_isSourceFile,activity('lookup_obtainJsonConfigFile').output.firstRow.adlsSource.directory,activity('lookup_obtainJsonConfigFile').output.firstRow.adlsTarget.directory))",
+													"type": "Expression"
+												},
+												"par_filename": {
+													"value": "@pipeline().parameters.par_filename",
+													"type": "Expression"
+												},
+												"par_columnDelimiter": {
+													"value": "@if(pipeline().parameters.par_isSourceFile,activity('lookup_obtainJsonConfigFile').output.firstRow.csvSource.columnDelimiter,activity('lookup_obtainJsonConfigFile').output.firstRow.csvTarget.columnDelimiter)",
+													"type": "Expression"
+												},
+												"par_encoding": {
+													"value": "@if(pipeline().parameters.par_isSourceFile,activity('lookup_obtainJsonConfigFile').output.firstRow.csvSource.encoding,activity('lookup_obtainJsonConfigFile').output.firstRow.csvTarget.encoding)",
+													"type": "Expression"
+												},
+												"par_escapeCharacter": {
+													"value": "@if(pipeline().parameters.par_isSourceFile,activity('lookup_obtainJsonConfigFile').output.firstRow.csvSource.escapeCharacter,activity('lookup_obtainJsonConfigFile').output.firstRow.csvTarget.escapeCharacter)",
+													"type": "Expression"
+												},
+												"par_quoteCharacter": {
+													"value": "@if(pipeline().parameters.par_isSourceFile,activity('lookup_obtainJsonConfigFile').output.firstRow.csvSource.quoteCharacter,activity('lookup_obtainJsonConfigFile').output.firstRow.csvTarget.quoteCharacter)",
+													"type": "Expression"
+												},
+												"par_firstRowAsHeader": {
+													"value": "@if(pipeline().parameters.par_isSourceFile,activity('lookup_obtainJsonConfigFile').output.firstRow.csvSource.firstRowAsHeader,activity('lookup_obtainJsonConfigFile').output.firstRow.csvTarget.firstRowAsHeader)",
+													"type": "Expression"
+												},
+												"par_compressionType": {
+													"value": "@if(pipeline().parameters.par_isSourceFile,activity('lookup_obtainJsonConfigFile').output.firstRow.csvSource.compressionType,activity('lookup_obtainJsonConfigFile').output.firstRow.csvTarget.compressionType)",
+													"type": "Expression"
+												},
+												"par_compressionLevel": {
+													"value": "@if(pipeline().parameters.par_isSourceFile,activity('lookup_obtainJsonConfigFile').output.firstRow.csvSource.compressionLevel,activity('lookup_obtainJsonConfigFile').output.firstRow.csvTarget.compressionLevel)",
+													"type": "Expression"
+												},
+												"par_nullValue": {
+													"value": "@if(pipeline().parameters.par_isSourceFile,if(contains(activity('lookup_obtainJsonConfigFile').output.firstRow.csvSource,'nullValue'),activity('lookup_obtainJsonConfigFile').output.firstRow.csvSource.nullValue, ''),if(contains(activity('lookup_obtainJsonConfigFile').output.firstRow.csvTarget,'nullValue'),activity('lookup_obtainJsonConfigFile').output.firstRow.csvTarget.nullValue, ''))",
+													"type": "Expression"
+												},
+												"par_rowDelimiter": {
+													"value": "@if(pipeline().parameters.par_isSourceFile,activity('lookup_obtainJsonConfigFile').output.firstRow.csvSource.rowDelimiter,activity('lookup_obtainJsonConfigFile').output.firstRow.csvTarget.rowDelimiter)",
+													"type": "Expression"
+												}
+											}
+										},
+										"fieldList": [
+											"structure",
+											"columnCount"
+										],
+										"storeSettings": {
+											"type": "AzureBlobFSReadSettings",
+											"recursive": true,
+											"enablePartitionDiscovery": false
+										},
+										"formatSettings": {
+											"type": "DelimitedTextReadSettings"
+										}
+									}
+								},
+								{
+									"name": "getMetadata_ofCsvSchemaFile",
+									"type": "GetMetadata",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "0.01:00:00",
+										"retry": 3,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"fieldList": [
+											"structure",
+											"columnCount"
+										],
+										"storeSettings": {
+											"type": "AzureBlobFSReadSettings",
+											"recursive": true,
+											"enablePartitionDiscovery": false
+										},
+										"formatSettings": {
+											"type": "DelimitedTextReadSettings"
+										}
+									}
+								},
+								{
+									"name": "executePipeline_writeErrorLog3",
+									"description": "Pass error information to pl_writeLogToQueue and execute it.",
+									"type": "ExecutePipeline",
+									"dependsOn": [
+										{
+											"activity": "getMetadata_ofCsvSchemaFile",
+											"dependencyConditions": [
+												"Failed"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"waitOnCompletion": false,
+										"parameters": {
+											"par_logType": "Error",
+											"par_logId": {
+												"value": "@activity('getMetadata_ofCsvSchemaFile').Error.errorCode",
+												"type": "Expression"
+											},
+											"par_logMessage": {
+												"value": "@activity('getMetadata_ofCsvSchemaFile').Error.message",
+												"type": "Expression"
+											},
+											"par_jobName": {
+												"value": "@pipeline().Pipeline",
+												"type": "Expression"
+											},
+											"par_jobId": {
+												"value": "@pipeline().parameters.par_jobId",
+												"type": "Expression"
+											},
+											"par_jobRunId": {
+												"value": "@pipeline().RunId",
+												"type": "Expression"
+											},
+											"par_groupId": {
+												"value": "@pipeline().GroupId",
+												"type": "Expression"
+											},
+											"par_triggerId": {
+												"value": "@pipeline().TriggerId",
+												"type": "Expression"
+											},
+											"par_triggerName": {
+												"value": "@pipeline().TriggerName",
+												"type": "Expression"
+											},
+											"par_triggerTime": {
+												"value": "@pipeline().TriggerTime",
+												"type": "Expression"
+											},
+											"par_parentJobRunId": {
+												"value": "@pipeline()?.TriggeredByPipelineRunId",
+												"type": "Expression"
+											},
+											"par_impact": "3",
+											"par_urgency": "3",
+											"par_ticketTitle": "Reading schema config file is not working.",
+											"par_ticketDescription": {
+												"value": "@concat('Reading of schema config file from metadata storage account is not working. Please resolve issue as soon as possible. Error message: ',activity('getMetadata_ofCsvSchemaFile').Error.message)",
+												"type": "Expression"
+											},
+											"par_recipientLeanIxId": "null",
+											"par_businessSupportGroup": "null",
+											"par_technicalSupportGroup": "null"
+										}
+									}
+								},
+								{
+									"name": "executePipeline_writeErrorLog2",
+									"description": "Pass error information to pl_writeLogToQueue and execute it.",
+									"type": "ExecutePipeline",
+									"dependsOn": [
+										{
+											"activity": "getMetadata_ofCsvFileToValidate",
+											"dependencyConditions": [
+												"Failed"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"waitOnCompletion": false,
+										"parameters": {
+											"par_logType": "Error",
+											"par_logId": {
+												"value": "@activity('getMetadata_ofCsvFileToValidate').Error.errorCode",
+												"type": "Expression"
+											},
+											"par_logMessage": {
+												"value": "@activity('getMetadata_ofCsvFileToValidate').Error.message",
+												"type": "Expression"
+											},
+											"par_jobName": {
+												"value": "@pipeline().Pipeline",
+												"type": "Expression"
+											},
+											"par_jobId": {
+												"value": "@pipeline().parameters.par_jobId",
+												"type": "Expression"
+											},
+											"par_jobRunId": {
+												"value": "@pipeline().RunId",
+												"type": "Expression"
+											},
+											"par_groupId": {
+												"value": "@pipeline().GroupId",
+												"type": "Expression"
+											},
+											"par_triggerId": {
+												"value": "@pipeline().TriggerId",
+												"type": "Expression"
+											},
+											"par_triggerName": {
+												"value": "@pipeline().TriggerName",
+												"type": "Expression"
+											},
+											"par_triggerTime": {
+												"value": "@pipeline().TriggerTime",
+												"type": "Expression"
+											},
+											"par_parentJobRunId": {
+												"value": "@pipeline()?.TriggeredByPipelineRunId",
+												"type": "Expression"
+											},
+											"par_impact": "2",
+											"par_urgency": "2",
+											"par_ticketTitle": "Reading schema of file is not working.",
+											"par_ticketDescription": {
+												"value": "@concat('Reading schema of file is not working. Please resolve issue as soon as possible. Error message: ',activity('getMetadata_ofCsvFileToValidate').Error.message)",
+												"type": "Expression"
+											},
+											"par_recipientLeanIxId": "null",
+											"par_businessSupportGroup": "null",
+											"par_technicalSupportGroup": "null"
+										}
+									}
+								},
+								{
+									"name": "set_isSchemaValid_csv",
+									"type": "SetVariable",
+									"dependsOn": [
+										{
+											"activity": "getMetadata_ofCsvFileToValidate",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										},
+										{
+											"activity": "getMetadata_ofCsvSchemaFile",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"variableName": "var_isSchemaValid",
+										"value": {
+											"value": "@equals(activity('getMetadata_ofCsvFileToValidate').output.structure,activity('getMetadata_ofCsvSchemaFile').output.structure)",
+											"type": "Expression"
+										}
+									}
+								}
+							]
+						},
+						{
+							"value": "parquet",
+							"activities": [
+								{
+									"name": "getMetadata_ofParquetFileToValidate",
+									"type": "GetMetadata",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "0.01:00:00",
+										"retry": 3,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"fieldList": [
+											"structure",
+											"columnCount"
+										],
+										"storeSettings": {
+											"type": "AzureBlobFSReadSettings",
+											"recursive": true,
+											"enablePartitionDiscovery": false
+										}
+									}
+								},
+								{
+									"name": "getMetadata_ofParquetSchemaFile",
+									"type": "GetMetadata",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "0.01:00:00",
+										"retry": 3,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"fieldList": [
+											"structure",
+											"columnCount"
+										],
+										"storeSettings": {
+											"type": "AzureBlobFSReadSettings",
+											"recursive": true,
+											"enablePartitionDiscovery": false
+										}
+									}
+								},
+								{
+									"name": "executePipeline_writeErrorLog5",
+									"description": "Pass error information to pl_writeLogToQueue and execute it.",
+									"type": "ExecutePipeline",
+									"dependsOn": [
+										{
+											"activity": "getMetadata_ofParquetSchemaFile",
+											"dependencyConditions": [
+												"Failed"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"waitOnCompletion": false,
+										"parameters": {
+											"par_logType": "Error",
+											"par_logId": {
+												"value": "@activity('getMetadata_ofParquetSchemaFile').Error.errorCode",
+												"type": "Expression"
+											},
+											"par_logMessage": {
+												"value": "@activity('getMetadata_ofParquetSchemaFile').Error.message",
+												"type": "Expression"
+											},
+											"par_jobName": {
+												"value": "@pipeline().Pipeline",
+												"type": "Expression"
+											},
+											"par_jobId": {
+												"value": "@pipeline().parameters.par_jobId",
+												"type": "Expression"
+											},
+											"par_jobRunId": {
+												"value": "@pipeline().RunId",
+												"type": "Expression"
+											},
+											"par_groupId": {
+												"value": "@pipeline().GroupId",
+												"type": "Expression"
+											},
+											"par_triggerId": {
+												"value": "@pipeline().TriggerId",
+												"type": "Expression"
+											},
+											"par_triggerName": {
+												"value": "@pipeline().TriggerName",
+												"type": "Expression"
+											},
+											"par_triggerTime": {
+												"value": "@pipeline().TriggerTime",
+												"type": "Expression"
+											},
+											"par_parentJobRunId": {
+												"value": "@pipeline()?.TriggeredByPipelineRunId",
+												"type": "Expression"
+											},
+											"par_impact": "3",
+											"par_urgency": "3",
+											"par_ticketTitle": "Reading schema config file is not working.",
+											"par_ticketDescription": {
+												"value": "@concat('Reading of schema config file from metadata storage account is not working. Please resolve issue as soon as possible. Error message: ',activity('getMetadata_ofParquetSchemaFile').Error.message)",
+												"type": "Expression"
+											},
+											"par_recipientLeanIxId": "null",
+											"par_businessSupportGroup": "null",
+											"par_technicalSupportGroup": "null"
+										}
+									}
+								},
+								{
+									"name": "executePipeline_writeErrorLog4",
+									"description": "Pass error information to pl_writeLogToQueue and execute it.",
+									"type": "ExecutePipeline",
+									"dependsOn": [
+										{
+											"activity": "getMetadata_ofParquetFileToValidate",
+											"dependencyConditions": [
+												"Failed"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"waitOnCompletion": false,
+										"parameters": {
+											"par_logType": "Error",
+											"par_logId": {
+												"value": "@activity('getMetadata_ofParquetFileToValidate').Error.errorCode",
+												"type": "Expression"
+											},
+											"par_logMessage": {
+												"value": "@activity('getMetadata_ofParquetFileToValidate').Error.message",
+												"type": "Expression"
+											},
+											"par_jobName": {
+												"value": "@pipeline().Pipeline",
+												"type": "Expression"
+											},
+											"par_jobId": {
+												"value": "@pipeline().parameters.par_jobId",
+												"type": "Expression"
+											},
+											"par_jobRunId": {
+												"value": "@pipeline().RunId",
+												"type": "Expression"
+											},
+											"par_groupId": {
+												"value": "@pipeline().GroupId",
+												"type": "Expression"
+											},
+											"par_triggerId": {
+												"value": "@pipeline().TriggerId",
+												"type": "Expression"
+											},
+											"par_triggerName": {
+												"value": "@pipeline().TriggerName",
+												"type": "Expression"
+											},
+											"par_triggerTime": {
+												"value": "@pipeline().TriggerTime",
+												"type": "Expression"
+											},
+											"par_parentJobRunId": {
+												"value": "@pipeline()?.TriggeredByPipelineRunId",
+												"type": "Expression"
+											},
+											"par_impact": "2",
+											"par_urgency": "2",
+											"par_ticketTitle": "Reading schema of file is not working.",
+											"par_ticketDescription": {
+												"value": "@concat('Reading schema of file is not working. Please resolve issue as soon as possible. Error message: ',activity('getMetadata_ofParquetFileToValidate').Error.message)",
+												"type": "Expression"
+											},
+											"par_recipientLeanIxId": "null",
+											"par_businessSupportGroup": "null",
+											"par_technicalSupportGroup": "null"
+										}
+									}
+								},
+								{
+									"name": "set_isSchemaValid_parquet",
+									"type": "SetVariable",
+									"dependsOn": [
+										{
+											"activity": "getMetadata_ofParquetSchemaFile",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										},
+										{
+											"activity": "getMetadata_ofParquetFileToValidate",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"variableName": "var_isSchemaValid",
+										"value": {
+											"value": "@equals(activity('getMetadata_ofParquetFileToValidate').output.structure,activity('getMetadata_ofParquetSchemaFile').output.structure)",
+											"type": "Expression"
+										}
+									}
+								}
+							]
+						}
+					],
+					"defaultActivities": [
+						{
+							"name": "fail_unsupportedFileType",
+							"type": "Fail",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"message": "The file schema could not be validated, since the file tpe is not supported",
+								"errorCode": "UNSUPPORTED FILE TYPE"
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "if_schemaIsValid",
+				"type": "IfCondition",
+				"dependsOn": [
+					{
+						"activity": "switch_uponFileType",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"expression": {
+						"value": "@variables('var_isSchemaValid')",
+						"type": "Expression"
+					},
+					"ifFalseActivities": [
+						{
+							"name": "fail_schemaStructureNotIdentical",
+							"type": "Fail",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"message": {
+									"value": "@concat('The csv schema of the file ', pipeline().parameters.par_filename, ' is not valid when compared to the reference file ', activity('lookup_obtainJsonConfigFile').output.firstRow.sourceSchemaFileName, '.')",
+									"type": "Expression"
+								},
+								"errorCode": "CSV_SCHEMA_INVALID"
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "setVar_fileType",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "lookup_obtainJsonConfigFile",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "var_fileType",
+					"value": {
+						"value": "@if(contains(activity('lookup_obtainJsonConfigFile').output.firstRow,'fileType'),if(or(equals(replace(activity('lookup_obtainJsonConfigFile').output.firstRow.fileType,'.',''),'csv'),equals(replace(activity('lookup_obtainJsonConfigFile').output.firstRow.fileType,'.',''),'txt')),'csv or txt',replace(activity('lookup_obtainJsonConfigFile').output.firstRow.fileType,'.','')),'')",
+						"type": "Expression"
+					}
+				}
+			}
+		],
+		"parameters": {
+			"par_filename": {
+				"type": "string"
+			},
+			"par_jobId": {
+				"type": "string"
+			},
+			"par_isSourceFile": {
+				"type": "bool"
+			}
+		},
+		"variables": {
+			"var_isSchemaValid": {
+				"type": "Boolean",
+				"defaultValue": false
+			},
+			"var_fileType": {
+				"type": "String"
+			}
+		},
+		"folder": {
+			"name": "4_Shared/Schema Validation"
+		},
+		"annotations": []
+	}
+}

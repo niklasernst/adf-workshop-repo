@@ -1,0 +1,199 @@
+{
+	"name": "pl_writeLogToQueue",
+	"properties": {
+		"activities": [
+			{
+				"name": "web_getSasTokenFromAkv",
+				"type": "WebActivity",
+				"dependsOn": [
+					{
+						"activity": "setVar_messageText",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.01:00:00",
+					"retry": 3,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": true,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"url": {
+						"value": "@concat(pipeline().globalParameters.par_akvSasTokenUrlForWritingToQueue,'?api-version=7.0')",
+						"type": "Expression"
+					},
+					"method": "GET",
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://vault.azure.net"
+					}
+				}
+			},
+			{
+				"name": "web_writeToStorageQueue",
+				"type": "WebActivity",
+				"dependsOn": [
+					{
+						"activity": "web_getSasTokenFromAkv",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.01:00:00",
+					"retry": 3,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"url": {
+						"value": "@concat('https://', pipeline().globalParameters.par_metadataStorageAccountName, pipeline().globalParameters.par_environment, '.queue.core.windows.net/', pipeline().globalParameters.par_loggingStorageQueueName, '/messages?visibilitytimeout=30&timeout=30','&', activity('web_getSasTokenFromAkv').output.value)",
+						"type": "Expression"
+					},
+					"method": "POST",
+					"body": {
+						"value": "@concat('<QueueMessage>  \n    <MessageText>',variables('var_messageText'),'</MessageText>  \n</QueueMessage>')",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "setVar_messageText",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "setVar_mandatoryText",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "setVar_snowTicketText",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "var_messageText",
+					"value": {
+						"value": "@if(equals(pipeline().parameters.par_logType, 'Error'),concat(variables('var_mandatoryText'),variables('var_snowTicketText')), variables('var_mandatoryText'))",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "setVar_mandatoryText",
+				"type": "SetVariable",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "var_mandatoryText",
+					"value": {
+						"value": "@concat('logType: ', pipeline().parameters.par_logType,'\njobId: ', pipeline().parameters.par_jobId,'\nlogMessage: ', pipeline().parameters.par_logMessage,'\njobName: ', pipeline().parameters.par_jobName,'\njobId: ', pipeline().parameters.par_jobId,'\njobRunId: ', pipeline().parameters.par_jobRunId,'\ngroupId', pipeline().parameters.par_groupId,'\ntriggerId', pipeline().parameters.par_triggerId,'\ntriggerName', pipeline().parameters.par_triggerName,'\ntriggerTime', pipeline().parameters.par_triggerTime,'\nparentJobRunId: ', pipeline().parameters.par_parentJobRunId)",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "setVar_snowTicketText",
+				"type": "SetVariable",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "var_snowTicketText",
+					"value": {
+						"value": "@concat('impact: ', pipeline().parameters.par_impact,'\nurgency: ', pipeline().parameters.par_urgency,'\ntitle: ', pipeline().parameters.par_ticketTitle,'\nmessage: ', pipeline().parameters.par_ticketDescription,'\nrecipient: ', pipeline().parameters.par_recipientLeanIxId,'\nbusinessSupportGroup: ', pipeline().parameters.par_businessSupportGroup,'\nbusinessSupportGroup: ', pipeline().parameters.par_technicalSupportGroup)",
+						"type": "Expression"
+					}
+				}
+			}
+		],
+		"parameters": {
+			"par_logType": {
+				"type": "string"
+			},
+			"par_logId": {
+				"type": "string"
+			},
+			"par_logMessage": {
+				"type": "string"
+			},
+			"par_jobName": {
+				"type": "string"
+			},
+			"par_jobId": {
+				"type": "string"
+			},
+			"par_jobRunId": {
+				"type": "string"
+			},
+			"par_groupId": {
+				"type": "string"
+			},
+			"par_triggerId": {
+				"type": "string"
+			},
+			"par_triggerName": {
+				"type": "string"
+			},
+			"par_triggerTime": {
+				"type": "string"
+			},
+			"par_parentJobRunId": {
+				"type": "string"
+			},
+			"par_impact": {
+				"type": "string",
+				"defaultValue": null
+			},
+			"par_urgency": {
+				"type": "string",
+				"defaultValue": null
+			},
+			"par_ticketTitle": {
+				"type": "string",
+				"defaultValue": null
+			},
+			"par_ticketDescription": {
+				"type": "string",
+				"defaultValue": null
+			},
+			"par_recipientLeanIxId": {
+				"type": "string",
+				"defaultValue": null
+			},
+			"par_businessSupportGroup": {
+				"type": "string",
+				"defaultValue": null
+			},
+			"par_technicalSupportGroup": {
+				"type": "string",
+				"defaultValue": null
+			}
+		},
+		"variables": {
+			"var_messageText": {
+				"type": "String"
+			},
+			"var_mandatoryText": {
+				"type": "String"
+			},
+			"var_snowTicketText": {
+				"type": "String"
+			}
+		},
+		"folder": {
+			"name": "4_Shared/Logging and Alerting"
+		},
+		"annotations": []
+	}
+}
