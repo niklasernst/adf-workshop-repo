@@ -1,10 +1,16 @@
 {
 	"name": "ls_http_anonymous",
 	"properties": {
+		"description": "This HTTP linked service takes the base URL as parameter and uses anonymous as authentication type.",
+		"parameters": {
+			"par_baseUrl": {
+				"type": "string"
+			}
+		},
 		"annotations": [],
 		"type": "HttpServer",
 		"typeProperties": {
-			"url": "test",
+			"url": "@{linkedService().par_baseUrl}",
 			"enableServerCertificateValidation": true,
 			"authenticationType": "Anonymous"
 		}
