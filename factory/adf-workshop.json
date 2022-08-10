@@ -17,6 +17,10 @@
 			"par_metadataStorageAccountName": {
 				"type": "string",
 				"value": "workshopmetadata"
+			},
+			"par_dataflowConfigStorageAccountDirectory": {
+				"type": "string",
+				"value": "flowjobconfig"
 			}
 		}
 	},
