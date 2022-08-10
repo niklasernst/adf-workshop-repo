@@ -57,6 +57,10 @@
 			"par_historyStorageAccountContainer": {
 				"type": "string",
 				"value": "adfhistory"
+			},
+			"par_schemaFileStorageAccountDirectory": {
+				"type": "string",
+				"value": "flowjobschema"
 			}
 		}
 	},
