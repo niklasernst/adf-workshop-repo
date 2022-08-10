@@ -1048,7 +1048,8 @@
 		],
 		"parameters": {
 			"par_jobId": {
-				"type": "string"
+				"type": "string",
+				"defaultValue": "http-1_ING"
 			}
 		},
 		"variables": {
