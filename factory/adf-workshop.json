@@ -9,6 +9,10 @@
 			"par_loggingStorageQueueName": {
 				"type": "string",
 				"value": "joberrors"
+			},
+			"par_jobmetadataStorageAccountContainer": {
+				"type": "string",
+				"value": "jobmetadata"
 			}
 		}
 	},
