@@ -246,6 +246,60 @@
 									},
 									"userProperties": [],
 									"typeProperties": {
+										"dataset": {
+											"referenceName": "ds_adlsCsvFile_defaultRowDelimiter",
+											"type": "DatasetReference",
+											"parameters": {
+												"par_storageAccount": {
+													"value": "@concat(pipeline().globalParameters.par_metadataStorageAccountName,pipeline().globalParameters.par_environment)",
+													"type": "Expression"
+												},
+												"par_container": {
+													"value": "@pipeline().globalParameters.par_jobmetadataStorageAccountContainer",
+													"type": "Expression"
+												},
+												"par_directory": {
+													"value": "@toLower(pipeline().globalParameters.par_schemaFileStorageAccountDirectory)",
+													"type": "Expression"
+												},
+												"par_filename": {
+													"value": "@activity('lookup_obtainJsonConfigFile').output.firstRow.sourceSchemaFileName",
+													"type": "Expression"
+												},
+												"par_columnDelimiter": {
+													"value": "@if(pipeline().parameters.par_isSourceFile,activity('lookup_obtainJsonConfigFile').output.firstRow.csvSource.columnDelimiter,activity('lookup_obtainJsonConfigFile').output.firstRow.csvTarget.columnDelimiter)",
+													"type": "Expression"
+												},
+												"par_encoding": {
+													"value": "@if(pipeline().parameters.par_isSourceFile,activity('lookup_obtainJsonConfigFile').output.firstRow.csvSource.encoding,activity('lookup_obtainJsonConfigFile').output.firstRow.csvTarget.encoding)",
+													"type": "Expression"
+												},
+												"par_escapeCharacter": {
+													"value": "@if(pipeline().parameters.par_isSourceFile,activity('lookup_obtainJsonConfigFile').output.firstRow.csvSource.escapeCharacter,activity('lookup_obtainJsonConfigFile').output.firstRow.csvTarget.escapeCharacter)",
+													"type": "Expression"
+												},
+												"par_quoteCharacter": {
+													"value": "@if(pipeline().parameters.par_isSourceFile,activity('lookup_obtainJsonConfigFile').output.firstRow.csvSource.quoteCharacter,activity('lookup_obtainJsonConfigFile').output.firstRow.csvTarget.quoteCharacter)",
+													"type": "Expression"
+												},
+												"par_firstRowAsHeader": {
+													"value": "@if(pipeline().parameters.par_isSourceFile,activity('lookup_obtainJsonConfigFile').output.firstRow.csvSource.firstRowAsHeader,activity('lookup_obtainJsonConfigFile').output.firstRow.csvTarget.firstRowAsHeader)",
+													"type": "Expression"
+												},
+												"par_compressionType": {
+													"value": "@if(pipeline().parameters.par_isSourceFile,activity('lookup_obtainJsonConfigFile').output.firstRow.csvSource.compressionType,activity('lookup_obtainJsonConfigFile').output.firstRow.csvTarget.compressionType)",
+													"type": "Expression"
+												},
+												"par_compressionLevel": {
+													"value": "@if(pipeline().parameters.par_isSourceFile,activity('lookup_obtainJsonConfigFile').output.firstRow.csvSource.compressionLevel,activity('lookup_obtainJsonConfigFile').output.firstRow.csvTarget.compressionLevel)",
+													"type": "Expression"
+												},
+												"par_nullValue": {
+													"value": "@if(pipeline().parameters.par_isSourceFile,if(contains(activity('lookup_obtainJsonConfigFile').output.firstRow.csvSource,'nullValue'),activity('lookup_obtainJsonConfigFile').output.firstRow.csvSource.nullValue, ''),if(contains(activity('lookup_obtainJsonConfigFile').output.firstRow.csvTarget,'nullValue'),activity('lookup_obtainJsonConfigFile').output.firstRow.csvTarget.nullValue, ''))",
+													"type": "Expression"
+												}
+											}
+										},
 										"fieldList": [
 											"structure",
 											"columnCount"
@@ -452,6 +506,28 @@
 									},
 									"userProperties": [],
 									"typeProperties": {
+										"dataset": {
+											"referenceName": "ds_adlsParquetFile",
+											"type": "DatasetReference",
+											"parameters": {
+												"par_storageAccount": {
+													"value": "@concat(if(pipeline().parameters.par_isSourceFile,activity('lookup_obtainJsonConfigFile').output.firstRow.adlsSource.storageAccount,activity('lookup_obtainJsonConfigFile').output.firstRow.adlsTarget.storageAccount),pipeline().globalParameters.par_environment)",
+													"type": "Expression"
+												},
+												"par_container": {
+													"value": "@if(pipeline().parameters.par_isSourceFile,activity('lookup_obtainJsonConfigFile').output.firstRow.adlsSource.container,activity('lookup_obtainJsonConfigFile').output.firstRow.adlsTarget.container)",
+													"type": "Expression"
+												},
+												"par_directory": {
+													"value": "@toLower(if(pipeline().parameters.par_isSourceFile,activity('lookup_obtainJsonConfigFile').output.firstRow.adlsSource.directory,activity('lookup_obtainJsonConfigFile').output.firstRow.adlsTarget.directory))",
+													"type": "Expression"
+												},
+												"par_filename": {
+													"value": "@pipeline().parameters.par_filename",
+													"type": "Expression"
+												}
+											}
+										},
 										"fieldList": [
 											"structure",
 											"columnCount"
@@ -476,6 +552,28 @@
 									},
 									"userProperties": [],
 									"typeProperties": {
+										"dataset": {
+											"referenceName": "ds_adlsParquetFile",
+											"type": "DatasetReference",
+											"parameters": {
+												"par_storageAccount": {
+													"value": "@concat(pipeline().globalParameters.par_metadataStorageAccountName,pipeline().globalParameters.par_environment)",
+													"type": "Expression"
+												},
+												"par_container": {
+													"value": "@pipeline().globalParameters.par_jobmetadataStorageAccountContainer",
+													"type": "Expression"
+												},
+												"par_directory": {
+													"value": "@toLower(pipeline().globalParameters.par_schemaFileStorageAccountDirectory)",
+													"type": "Expression"
+												},
+												"par_filename": {
+													"value": "@activity('lookup_obtainJsonConfigFile').output.firstRow.sourceSchemaFileName",
+													"type": "Expression"
+												}
+											}
+										},
 										"fieldList": [
 											"structure",
 											"columnCount"
