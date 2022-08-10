@@ -1048,8 +1048,7 @@
 		],
 		"parameters": {
 			"par_jobId": {
-				"type": "string",
-				"defaultValue": "AM0131.01-1_ING"
+				"type": "string"
 			}
 		},
 		"variables": {
