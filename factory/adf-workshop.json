@@ -5,6 +5,10 @@
 			"par_environment": {
 				"type": "string",
 				"value": "sa"
+			},
+			"par_loggingStorageQueueName": {
+				"type": "string",
+				"value": "joberrors"
 			}
 		}
 	},
