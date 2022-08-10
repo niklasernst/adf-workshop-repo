@@ -29,6 +29,10 @@
 			"par_archiveStorageAccountName": {
 				"type": "string",
 				"value": "workshopmetadata"
+			},
+			"par_systemConfigStorageAccountDirectory": {
+				"type": "string",
+				"value": "systemconfig"
 			}
 		}
 	},
