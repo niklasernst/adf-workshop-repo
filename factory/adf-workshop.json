@@ -41,6 +41,10 @@
 			"par_dataflowMappingStorageAccountDirectory": {
 				"type": "string",
 				"value": "flowjobmapping"
+			},
+			"par_failedContainerName": {
+				"type": "string",
+				"value": "failed"
 			}
 		}
 	},
