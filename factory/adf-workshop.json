@@ -1,0 +1,12 @@
+{
+	"name": "adf-workshop",
+	"properties": {
+		"globalParameters": {
+			"par_environment": {
+				"type": "string",
+				"value": "devl"
+			}
+		}
+	},
+	"location": "westeurope"
+}
