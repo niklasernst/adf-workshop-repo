@@ -1,0 +1,116 @@
+{
+	"name": "ds_adlsCsvFile_defaultRowDelimiter",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "ls_adls",
+			"type": "LinkedServiceReference",
+			"parameters": {
+				"par_accountname": {
+					"value": "@dataset().par_storageAccount",
+					"type": "Expression"
+				}
+			}
+		},
+		"parameters": {
+			"par_storageAccount": {
+				"type": "string"
+			},
+			"par_container": {
+				"type": "string"
+			},
+			"par_directory": {
+				"type": "string"
+			},
+			"par_filename": {
+				"type": "string"
+			},
+			"par_columnDelimiter": {
+				"type": "string",
+				"defaultValue": ","
+			},
+			"par_encoding": {
+				"type": "string",
+				"defaultValue": "UTF-8"
+			},
+			"par_escapeCharacter": {
+				"type": "string",
+				"defaultValue": "\\"
+			},
+			"par_quoteCharacter": {
+				"type": "string",
+				"defaultValue": "\""
+			},
+			"par_firstRowAsHeader": {
+				"type": "bool",
+				"defaultValue": true
+			},
+			"par_compressionType": {
+				"type": "string",
+				"defaultValue": "None"
+			},
+			"par_compressionLevel": {
+				"type": "string",
+				"defaultValue": "Optimal"
+			},
+			"par_nullValue": {
+				"type": "string"
+			}
+		},
+		"folder": {
+			"name": "ADLS"
+		},
+		"annotations": [],
+		"type": "DelimitedText",
+		"typeProperties": {
+			"location": {
+				"type": "AzureBlobFSLocation",
+				"fileName": {
+					"value": "@dataset().par_filename",
+					"type": "Expression"
+				},
+				"folderPath": {
+					"value": "@dataset().par_directory",
+					"type": "Expression"
+				},
+				"fileSystem": {
+					"value": "@dataset().par_container",
+					"type": "Expression"
+				}
+			},
+			"columnDelimiter": {
+				"value": "@dataset().par_columnDelimiter",
+				"type": "Expression"
+			},
+			"compressionCodec": {
+				"value": "@dataset().par_compressionType",
+				"type": "Expression"
+			},
+			"compressionLevel": {
+				"value": "@dataset().par_compressionLevel",
+				"type": "Expression"
+			},
+			"encodingName": {
+				"value": "@dataset().par_encoding",
+				"type": "Expression"
+			},
+			"escapeChar": {
+				"value": "@dataset().par_escapeCharacter",
+				"type": "Expression"
+			},
+			"firstRowAsHeader": {
+				"value": "@dataset().par_firstRowAsHeader",
+				"type": "Expression"
+			},
+			"nullValue": {
+				"value": "@dataset().par_nullValue",
+				"type": "Expression"
+			},
+			"quoteChar": {
+				"value": "@dataset().par_quoteCharacter",
+				"type": "Expression"
+			}
+		},
+		"schema": []
+	},
+	"type": "Microsoft.DataFactory/factories/datasets"
+}
