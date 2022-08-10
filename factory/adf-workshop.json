@@ -21,6 +21,10 @@
 			"par_dataflowConfigStorageAccountDirectory": {
 				"type": "string",
 				"value": "flowjobconfig"
+			},
+			"par_akvSasTokenUrlForWritingToQueue": {
+				"type": "string",
+				"value": "TODO"
 			}
 		}
 	},
