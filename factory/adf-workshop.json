@@ -49,6 +49,10 @@
 			"par_defaultMappingFileName": {
 				"type": "string",
 				"value": "mappingDefault.json"
+			},
+			"par_historyStorageAccountName": {
+				"type": "string",
+				"value": "workshophistory"
 			}
 		}
 	},
