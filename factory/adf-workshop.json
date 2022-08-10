@@ -33,6 +33,10 @@
 			"par_systemConfigStorageAccountDirectory": {
 				"type": "string",
 				"value": "systemconfig"
+			},
+			"par_adfLoggingStorageAccountName": {
+				"type": "string",
+				"value": "workshopmetadata"
 			}
 		}
 	},
