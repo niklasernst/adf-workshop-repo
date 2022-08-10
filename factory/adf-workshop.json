@@ -37,6 +37,10 @@
 			"par_adfLoggingStorageAccountName": {
 				"type": "string",
 				"value": "workshopmetadata"
+			},
+			"par_dataflowMappingStorageAccountDirectory": {
+				"type": "string",
+				"value": "flowjobmapping"
 			}
 		}
 	},
