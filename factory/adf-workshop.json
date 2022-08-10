@@ -53,6 +53,10 @@
 			"par_historyStorageAccountName": {
 				"type": "string",
 				"value": "workshophistory"
+			},
+			"par_historyStorageAccountContainer": {
+				"type": "string",
+				"value": "adfhistory"
 			}
 		}
 	},
