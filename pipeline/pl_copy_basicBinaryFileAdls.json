@@ -103,6 +103,10 @@
 				],
 				"userProperties": [],
 				"typeProperties": {
+					"pipeline": {
+						"referenceName": "pl_writeLogToQueue",
+						"type": "PipelineReference"
+					},
 					"waitOnCompletion": false,
 					"parameters": {
 						"par_logType": "Error",
