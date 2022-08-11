@@ -92,19 +92,6 @@
 				}
 			},
 			{
-				"name": "executePipeline_task1",
-				"type": "ExecutePipeline",
-				"dependsOn": [],
-				"userProperties": [],
-				"typeProperties": {
-					"pipeline": {
-						"referenceName": "pl_copy_basicBinaryFile_TODO",
-						"type": "PipelineReference"
-					},
-					"waitOnCompletion": false
-				}
-			},
-			{
 				"name": "executePipeline_writeSuccessLog",
 				"description": "Pass error information to pl_writeLogToQueue and execute it.",
 				"type": "ExecutePipeline",
@@ -141,6 +128,15 @@
 							"type": "Expression"
 						}
 					}
+				}
+			},
+			{
+				"name": "executePipeline_task1",
+				"type": "ExecutePipeline",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"waitOnCompletion": true
 				}
 			}
 		],
