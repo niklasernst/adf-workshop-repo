@@ -136,48 +136,8 @@
 			"par_jobRunId": {
 				"type": "string"
 			},
-			"par_groupId": {
-				"type": "string"
-			},
-			"par_triggerId": {
-				"type": "string"
-			},
-			"par_triggerName": {
-				"type": "string"
-			},
-			"par_triggerTime": {
-				"type": "string"
-			},
 			"par_parentJobRunId": {
 				"type": "string"
-			},
-			"par_impact": {
-				"type": "string",
-				"defaultValue": null
-			},
-			"par_urgency": {
-				"type": "string",
-				"defaultValue": null
-			},
-			"par_ticketTitle": {
-				"type": "string",
-				"defaultValue": null
-			},
-			"par_ticketDescription": {
-				"type": "string",
-				"defaultValue": null
-			},
-			"par_recipientLeanIxId": {
-				"type": "string",
-				"defaultValue": null
-			},
-			"par_businessSupportGroup": {
-				"type": "string",
-				"defaultValue": null
-			},
-			"par_technicalSupportGroup": {
-				"type": "string",
-				"defaultValue": null
 			}
 		},
 		"variables": {
