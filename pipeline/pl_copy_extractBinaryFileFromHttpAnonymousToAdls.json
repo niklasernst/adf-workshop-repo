@@ -269,10 +269,6 @@
 									"par_parentJobRunId": {
 										"value": "@pipeline()?.TriggeredByPipelineRunId",
 										"type": "Expression"
-									},
-									"par_kürzel": {
-										"value": "@pipeline().globalParameters.par_kürzel",
-										"type": "Expression"
 									}
 								}
 							}
@@ -382,10 +378,6 @@
 									},
 									"par_parentJobRunId": {
 										"value": "@pipeline()?.TriggeredByPipelineRunId",
-										"type": "Expression"
-									},
-									"par_kürzel": {
-										"value": "@pipeline().globalParameters.par_kürzel",
 										"type": "Expression"
 									}
 								}
@@ -683,10 +675,6 @@
 						"par_parentJobRunId": {
 							"value": "@pipeline()?.TriggeredByPipelineRunId",
 							"type": "Expression"
-						},
-						"par_kürzel": {
-							"value": "@pipeline().globalParameters.par_kürzel",
-							"type": "Expression"
 						}
 					}
 				}
@@ -731,10 +719,6 @@
 						},
 						"par_parentJobRunId": {
 							"value": "@pipeline()?.TriggeredByPipelineRunId",
-							"type": "Expression"
-						},
-						"par_kürzel": {
-							"value": "@pipeline().globalParameters.par_kürzel",
 							"type": "Expression"
 						}
 					}

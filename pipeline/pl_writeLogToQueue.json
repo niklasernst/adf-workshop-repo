@@ -98,7 +98,7 @@
 				"typeProperties": {
 					"variableName": "var_mandatoryText",
 					"value": {
-						"value": "@concat('logType: ', pipeline().parameters.par_logType,'\njobId: ', pipeline().parameters.par_jobId,'\nlogMessage: ', pipeline().parameters.par_logMessage,'\njobName: ', pipeline().parameters.par_jobName,'\njobId: ', pipeline().parameters.par_jobId,'\njobRunId: ', pipeline().parameters.par_jobRunId,'\ngroupId', pipeline().parameters.par_groupId,'\ntriggerId', pipeline().parameters.par_triggerId,'\ntriggerName', pipeline().parameters.par_triggerName,'\ntriggerTime', pipeline().parameters.par_triggerTime,'\nparentJobRunId: ', pipeline().parameters.par_parentJobRunId)",
+						"value": "@concat('kürzel: ',pipeline().globalParameters.par_kürzel,'\nlogType: ', pipeline().parameters.par_logType,'\njobId: ', pipeline().parameters.par_jobId,'\nlogMessage: ', pipeline().parameters.par_logMessage,'\njobName: ', pipeline().parameters.par_jobName,'\njobId: ', pipeline().parameters.par_jobId,'\njobRunId: ', pipeline().parameters.par_jobRunId,'\nparentJobRunId: ', pipeline().parameters.par_parentJobRunId)",
 						"type": "Expression"
 					}
 				}
@@ -137,9 +137,6 @@
 				"type": "string"
 			},
 			"par_parentJobRunId": {
-				"type": "string"
-			},
-			"par_kürzel": {
 				"type": "string"
 			}
 		},
