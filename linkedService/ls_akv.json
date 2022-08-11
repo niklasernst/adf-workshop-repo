@@ -1,10 +1,16 @@
 {
 	"name": "ls_akv",
+	"type": "Microsoft.DataFactory/factories/linkedservices",
 	"properties": {
+		"parameters": {
+			"par_azureKeyVaultName": {
+				"type": "string"
+			}
+		},
 		"annotations": [],
 		"type": "AzureKeyVault",
 		"typeProperties": {
-			"baseUrl": "https://akvworkshopdevl.vault.azure.net/"
+			"baseUrl": "@{concat('https://',linkedService().par_azureKeyVaultName,'.vault.azure.net')}"
 		}
 	}
 }
