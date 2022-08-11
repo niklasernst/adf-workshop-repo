@@ -941,7 +941,7 @@
 			}
 		},
 		"folder": {
-			"name": "1_Ingestion/HTTP"
+			"name": "AMIS/1_Ingestion/HTTP"
 		},
 		"annotations": [],
 		"lastPublishTime": "2022-04-13T10:07:16Z"
