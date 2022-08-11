@@ -109,27 +109,6 @@
 			},
 			"par_filename": {
 				"type": "string"
-			},
-			"par_impact": {
-				"type": "string"
-			},
-			"par_urgency": {
-				"type": "string"
-			},
-			"par_ticketTitle": {
-				"type": "string"
-			},
-			"par_ticketDescription": {
-				"type": "string"
-			},
-			"par_recipientLeanIxId": {
-				"type": "string"
-			},
-			"par_businessSupportGroup": {
-				"type": "string"
-			},
-			"par_technicalSupportGroup": {
-				"type": "string"
 			}
 		},
 		"folder": {
