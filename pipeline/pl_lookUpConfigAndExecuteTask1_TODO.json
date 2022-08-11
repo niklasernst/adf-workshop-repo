@@ -31,6 +31,8 @@
 						"referenceName": "ds_adlsJsonFile",
 						"type": "DatasetReference",
 						"parameters": {
+							"par_storageAccount": "t",
+							"par_container": "t",
 							"par_directory": {
 								"value": "@pipeline().globalParameters.par_kürzel",
 								"type": "Expression"
@@ -52,7 +54,7 @@
 					{
 						"activity": "lookup_obtainJsonConfigFile",
 						"dependencyConditions": [
-							"Failed"
+							"Succeeded"
 						]
 					}
 				],
@@ -95,7 +97,11 @@
 				"dependsOn": [],
 				"userProperties": [],
 				"typeProperties": {
-					"waitOnCompletion": true
+					"pipeline": {
+						"referenceName": "pl_copy_basicBinaryFile_TODO",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": false
 				}
 			},
 			{
