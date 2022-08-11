@@ -266,36 +266,14 @@
 										"value": "@pipeline().RunId",
 										"type": "Expression"
 									},
-									"par_groupId": {
-										"value": "@pipeline().GroupId",
-										"type": "Expression"
-									},
-									"par_triggerId": {
-										"value": "@pipeline().TriggerId",
-										"type": "Expression"
-									},
-									"par_triggerName": {
-										"value": "@pipeline().TriggerName",
-										"type": "Expression"
-									},
-									"par_triggerTime": {
-										"value": "@pipeline().TriggerTime",
-										"type": "Expression"
-									},
 									"par_parentJobRunId": {
 										"value": "@pipeline()?.TriggeredByPipelineRunId",
 										"type": "Expression"
 									},
-									"par_impact": "3",
-									"par_urgency": "3",
-									"par_ticketTitle": "There is a problem with the JSON config file content.",
-									"par_ticketDescription": {
-										"value": "@concat('Setting of variables based upon JSON config file content is failing. Please resolve issue as soon as possible. Error message: ',activity('fail_describeConfigError2').Error.message)",
+									"par_kürzel": {
+										"value": "@pipeline().globalParameters.par_kürzel",
 										"type": "Expression"
-									},
-									"par_recipientLeanIxId": "null",
-									"par_businessSupportGroup": "null",
-									"par_technicalSupportGroup": "null"
+									}
 								}
 							}
 						},
@@ -402,36 +380,14 @@
 										"value": "@pipeline().RunId",
 										"type": "Expression"
 									},
-									"par_groupId": {
-										"value": "@pipeline().GroupId",
-										"type": "Expression"
-									},
-									"par_triggerId": {
-										"value": "@pipeline().TriggerId",
-										"type": "Expression"
-									},
-									"par_triggerName": {
-										"value": "@pipeline().TriggerName",
-										"type": "Expression"
-									},
-									"par_triggerTime": {
-										"value": "@pipeline().TriggerTime",
-										"type": "Expression"
-									},
 									"par_parentJobRunId": {
 										"value": "@pipeline()?.TriggeredByPipelineRunId",
 										"type": "Expression"
 									},
-									"par_impact": "3",
-									"par_urgency": "3",
-									"par_ticketTitle": "There is a problem with the JSON config file content.",
-									"par_ticketDescription": {
-										"value": "@concat('Setting of variables based upon JSON config file content is failing. Please resolve issue as soon as possible. Error message: ',activity('fail_describeConfigError1').Error.message)",
+									"par_kürzel": {
+										"value": "@pipeline().globalParameters.par_kürzel",
 										"type": "Expression"
-									},
-									"par_recipientLeanIxId": "null",
-									"par_businessSupportGroup": "null",
-									"par_technicalSupportGroup": "null"
+									}
 								}
 							}
 						}
@@ -675,6 +631,10 @@
 						"par_parentJobRunId": {
 							"value": "@pipeline()?.TriggeredByPipelineRunId",
 							"type": "Expression"
+						},
+						"par_kürzel": {
+							"value": "@pipeline().globalParameters.par_kürzel",
+							"type": "Expression"
 						}
 					}
 				}
@@ -720,36 +680,14 @@
 							"value": "@pipeline().RunId",
 							"type": "Expression"
 						},
-						"par_groupId": {
-							"value": "@pipeline().GroupId",
-							"type": "Expression"
-						},
-						"par_triggerId": {
-							"value": "@pipeline().TriggerId",
-							"type": "Expression"
-						},
-						"par_triggerName": {
-							"value": "@pipeline().TriggerName",
-							"type": "Expression"
-						},
-						"par_triggerTime": {
-							"value": "@pipeline().TriggerTime",
-							"type": "Expression"
-						},
 						"par_parentJobRunId": {
 							"value": "@pipeline()?.TriggeredByPipelineRunId",
 							"type": "Expression"
 						},
-						"par_impact": "3",
-						"par_urgency": "3",
-						"par_ticketTitle": "Error occured trying to copy from SAP ODP to ADLS.",
-						"par_ticketDescription": {
-							"value": "@concat('An error occured trying to copy data from SAP ODP to ADLS. Please resolve issue as soon as possible. Error message: ',activity('copy_httpGetBinaryToAdls').Error.message)",
+						"par_kürzel": {
+							"value": "@pipeline().globalParameters.par_kürzel",
 							"type": "Expression"
-						},
-						"par_recipientLeanIxId": "null",
-						"par_businessSupportGroup": "null",
-						"par_technicalSupportGroup": "null"
+						}
 					}
 				}
 			},
@@ -791,24 +729,12 @@
 							"value": "@pipeline().RunId",
 							"type": "Expression"
 						},
-						"par_groupId": {
-							"value": "@pipeline().GroupId",
-							"type": "Expression"
-						},
-						"par_triggerId": {
-							"value": "@pipeline().TriggerId",
-							"type": "Expression"
-						},
-						"par_triggerName": {
-							"value": "@pipeline().TriggerName",
-							"type": "Expression"
-						},
-						"par_triggerTime": {
-							"value": "@pipeline().TriggerTime",
-							"type": "Expression"
-						},
 						"par_parentJobRunId": {
 							"value": "@pipeline()?.TriggeredByPipelineRunId",
+							"type": "Expression"
+						},
+						"par_kürzel": {
+							"value": "@pipeline().globalParameters.par_kürzel",
 							"type": "Expression"
 						}
 					}
@@ -986,36 +912,14 @@
 							"value": "@pipeline().RunId",
 							"type": "Expression"
 						},
-						"par_groupId": {
-							"value": "@pipeline().GroupId",
-							"type": "Expression"
-						},
-						"par_triggerId": {
-							"value": "@pipeline().TriggerId",
-							"type": "Expression"
-						},
-						"par_triggerName": {
-							"value": "@pipeline().TriggerName",
-							"type": "Expression"
-						},
-						"par_triggerTime": {
-							"value": "@pipeline().TriggerTime",
-							"type": "Expression"
-						},
 						"par_parentJobRunId": {
 							"value": "@pipeline()?.TriggeredByPipelineRunId",
 							"type": "Expression"
 						},
-						"par_impact": "3",
-						"par_urgency": "3",
-						"par_ticketTitle": "Reading JSON system config file is not working.",
-						"par_ticketDescription": {
-							"value": "@concat('Reading of JSON system config file from metadata storage account is not working. Please resolve issue as soon as possible. Error message: ',activity('lookup_obtainSourceSystemConfigFile').Error.message)",
+						"par_kürzel": {
+							"value": "@pipeline().globalParameters.par_kürzel",
 							"type": "Expression"
-						},
-						"par_recipientLeanIxId": "null",
-						"par_businessSupportGroup": "null",
-						"par_technicalSupportGroup": "null"
+						}
 					}
 				}
 			}

@@ -138,6 +138,9 @@
 			},
 			"par_parentJobRunId": {
 				"type": "string"
+			},
+			"par_kürzel": {
+				"type": "string"
 			}
 		},
 		"variables": {
