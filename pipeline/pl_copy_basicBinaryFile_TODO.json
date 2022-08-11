@@ -21,10 +21,7 @@
 						"storeSettings": {
 							"type": "AzureBlobFSReadSettings",
 							"recursive": false,
-							"deleteFilesAfterCompletion": {
-								"value": "@pipeline().parameters.par_deleteFilesAfterCompletion",
-								"type": "Expression"
-							}
+							"deleteFilesAfterCompletion": false
 						},
 						"formatSettings": {
 							"type": "BinaryReadSettings"
@@ -43,49 +40,13 @@
 				"inputs": [
 					{
 						"referenceName": "ds_adlsBinaryFile",
-						"type": "DatasetReference",
-						"parameters": {
-							"par_storageAccount": {
-								"value": "@pipeline().parameters.par_sourceStorageAccount",
-								"type": "Expression"
-							},
-							"par_container": {
-								"value": "@pipeline().parameters.par_sourceContainer",
-								"type": "Expression"
-							},
-							"par_directory": {
-								"value": "@pipeline().parameters.par_sourceDirectory",
-								"type": "Expression"
-							},
-							"par_filename": {
-								"value": "@pipeline().parameters.par_sourceFileName",
-								"type": "Expression"
-							}
-						}
+						"type": "DatasetReference"
 					}
 				],
 				"outputs": [
 					{
 						"referenceName": "ds_adlsBinaryFile",
-						"type": "DatasetReference",
-						"parameters": {
-							"par_storageAccount": {
-								"value": "@pipeline().parameters.par_targetStorageAccount",
-								"type": "Expression"
-							},
-							"par_container": {
-								"value": "@pipeline().parameters.par_targetContainer",
-								"type": "Expression"
-							},
-							"par_directory": {
-								"value": "@pipeline().parameters.par_targetDirectory",
-								"type": "Expression"
-							},
-							"par_filename": {
-								"value": "@pipeline().parameters.par_targetFileName",
-								"type": "Expression"
-							}
-						}
+						"type": "DatasetReference"
 					}
 				]
 			},
@@ -93,14 +54,7 @@
 				"name": "executePipeline_writeErrorLog",
 				"description": "Pass error information to pl_writeLogToQueue and execute it.",
 				"type": "ExecutePipeline",
-				"dependsOn": [
-					{
-						"activity": "copy_binaryFileAdlsToAdls",
-						"dependencyConditions": [
-							"Failed"
-						]
-					}
-				],
+				"dependsOn": [],
 				"userProperties": [],
 				"typeProperties": {
 					"pipeline": {
@@ -141,14 +95,7 @@
 				"name": "executePipeline_writeSuccessLog",
 				"description": "Pass error information to pl_writeLogToQueue and execute it.",
 				"type": "ExecutePipeline",
-				"dependsOn": [
-					{
-						"activity": "copy_binaryFileAdlsToAdls",
-						"dependencyConditions": [
-							"Succeeded"
-						]
-					}
-				],
+				"dependsOn": [],
 				"userProperties": [],
 				"typeProperties": {
 					"pipeline": {
@@ -184,30 +131,6 @@
 			"par_jobId": {
 				"type": "string",
 				"defaultValue": "Übung1"
-			},
-			"par_sourceStorageAccount": {
-				"type": "string"
-			},
-			"par_sourceContainer": {
-				"type": "string"
-			},
-			"par_sourceDirectory": {
-				"type": "string"
-			},
-			"par_sourceFilename": {
-				"type": "string"
-			},
-			"par_targetStorageAccount": {
-				"type": "string"
-			},
-			"par_targetContainer": {
-				"type": "string"
-			},
-			"par_targetDirectory": {
-				"type": "string"
-			},
-			"par_targetFileName": {
-				"type": "string"
 			},
 			"par_deleteFilesAfterCompletion": {
 				"type": "bool"
