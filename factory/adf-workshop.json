@@ -4,7 +4,7 @@
 		"globalParameters": {
 			"par_environment": {
 				"type": "string",
-				"value": "sa"
+				"value": "devl"
 			},
 			"par_loggingStorageQueueName": {
 				"type": "string",
