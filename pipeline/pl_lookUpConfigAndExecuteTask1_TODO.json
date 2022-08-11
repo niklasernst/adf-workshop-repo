@@ -84,6 +84,54 @@
 						}
 					}
 				}
+			},
+			{
+				"name": "executePipeline_task1",
+				"type": "ExecutePipeline",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"waitOnCompletion": true
+				}
+			},
+			{
+				"name": "executePipeline_writeSuccessLog",
+				"description": "Pass error information to pl_writeLogToQueue and execute it.",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "executePipeline_task1",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "pl_writeLogToQueue",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": false,
+					"parameters": {
+						"par_logType": "Success",
+						"par_logId": "TASK 1 EXECUTED",
+						"par_logMessage": "Finished task 2",
+						"par_jobName": {
+							"value": "@pipeline().Pipeline",
+							"type": "Expression"
+						},
+						"par_jobId": "Übung 2",
+						"par_jobRunId": {
+							"value": "@pipeline().RunId",
+							"type": "Expression"
+						},
+						"par_parentJobRunId": {
+							"value": "@pipeline()?.TriggeredByPipelineRunId",
+							"type": "Expression"
+						}
+					}
+				}
 			}
 		],
 		"parameters": {
