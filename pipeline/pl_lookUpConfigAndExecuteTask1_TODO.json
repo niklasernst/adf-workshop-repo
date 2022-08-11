@@ -20,7 +20,7 @@
 						"type": "JsonSource",
 						"storeSettings": {
 							"type": "AzureBlobFSReadSettings",
-							"recursive": true,
+							"recursive": false,
 							"enablePartitionDiscovery": false
 						},
 						"formatSettings": {
@@ -31,18 +31,6 @@
 						"referenceName": "ds_adlsJsonFile",
 						"type": "DatasetReference",
 						"parameters": {
-							"par_storageAccount": {
-								"value": "@concat(pipeline().globalParameters.par_metadataStorageAccountName,pipeline().globalParameters.par_environment)",
-								"type": "Expression"
-							},
-							"par_container": {
-								"value": "@pipeline().globalParameters.par_jobmetadataStorageAccountContainer",
-								"type": "Expression"
-							},
-							"par_directory": {
-								"value": "@toLower(pipeline().globalParameters.par_dataflowConfigStorageAccountDirectory)",
-								"type": "Expression"
-							},
 							"par_fileName": {
 								"value": "@concat(pipeline().parameters.par_jobId,'.json')",
 								"type": "Expression"
