@@ -31,6 +31,10 @@
 						"referenceName": "ds_adlsJsonFile",
 						"type": "DatasetReference",
 						"parameters": {
+							"par_directory": {
+								"value": "@pipeline().globalParameters.par_kürzel",
+								"type": "Expression"
+							},
 							"par_fileName": {
 								"value": "@concat(pipeline().parameters.par_jobId,'.json')",
 								"type": "Expression"
