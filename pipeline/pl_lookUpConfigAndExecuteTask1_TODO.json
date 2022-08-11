@@ -1,0 +1,112 @@
+{
+	"name": "pl_lookUpConfigAndExecuteTask1_TODO",
+	"properties": {
+		"activities": [
+			{
+				"name": "lookup_obtainJsonConfigFile",
+				"description": "Looks up json config files to obtain job parameters.",
+				"type": "Lookup",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.01:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "JsonSource",
+						"storeSettings": {
+							"type": "AzureBlobFSReadSettings",
+							"recursive": true,
+							"enablePartitionDiscovery": false
+						},
+						"formatSettings": {
+							"type": "JsonReadSettings"
+						}
+					},
+					"dataset": {
+						"referenceName": "ds_adlsJsonFile",
+						"type": "DatasetReference",
+						"parameters": {
+							"par_storageAccount": {
+								"value": "@concat(pipeline().globalParameters.par_metadataStorageAccountName,pipeline().globalParameters.par_environment)",
+								"type": "Expression"
+							},
+							"par_container": {
+								"value": "@pipeline().globalParameters.par_jobmetadataStorageAccountContainer",
+								"type": "Expression"
+							},
+							"par_directory": {
+								"value": "@toLower(pipeline().globalParameters.par_dataflowConfigStorageAccountDirectory)",
+								"type": "Expression"
+							},
+							"par_fileName": {
+								"value": "@concat(pipeline().parameters.par_jobId,'.json')",
+								"type": "Expression"
+							},
+							"par_encoding": "Default(UTF-8)"
+						}
+					}
+				}
+			},
+			{
+				"name": "executePipeline_writeErrorLog",
+				"description": "Pass error information to pl_writeLogToQueue and execute it.",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "lookup_obtainJsonConfigFile",
+						"dependencyConditions": [
+							"Failed"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "pl_writeLogToQueue",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": false,
+					"parameters": {
+						"par_logType": "Error",
+						"par_logId": {
+							"value": "@activity('lookup_obtainJsonConfigFile').Error.errorCode",
+							"type": "Expression"
+						},
+						"par_logMessage": {
+							"value": "@activity('lookup_obtainJsonConfigFile').Error.message",
+							"type": "Expression"
+						},
+						"par_jobName": {
+							"value": "@pipeline().Pipeline",
+							"type": "Expression"
+						},
+						"par_jobId": "Übung 2",
+						"par_jobRunId": {
+							"value": "@pipeline().RunId",
+							"type": "Expression"
+						},
+						"par_parentJobRunId": {
+							"value": "@pipeline()?.TriggeredByPipelineRunId",
+							"type": "Expression"
+						}
+					}
+				}
+			}
+		],
+		"parameters": {
+			"par_jobId": {
+				"type": "string",
+				"defaultValue": "task2"
+			}
+		},
+		"folder": {
+			"name": "Übung 2"
+		},
+		"annotations": []
+	}
+}
