@@ -61,6 +61,10 @@
 			"par_schemaFileStorageAccountDirectory": {
 				"type": "string",
 				"value": "flowjobschema"
+			},
+			"par_kürzel": {
+				"type": "string",
+				"value": "erni"
 			}
 		}
 	},
