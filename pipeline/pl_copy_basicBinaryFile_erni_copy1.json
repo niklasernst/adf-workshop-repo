@@ -46,7 +46,7 @@
 						"type": "DatasetReference",
 						"parameters": {
 							"par_storageAccount": {
-								"value": "@pipeline().parameters.par_sourceStorageAccount",
+								"value": "@concat(pipeline().parameters.par_sourceStorageAccount,pipeline().globalParameters.par_environment)",
 								"type": "Expression"
 							},
 							"par_container": {
