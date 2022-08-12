@@ -556,7 +556,7 @@
 										"type": "Expression"
 									},
 									"par_targetFileName": {
-										"value": "@variables('var_targetFilename')",
+										"value": "@concat(pipeline().globalParameters.par_kürzel,'_',variables('var_targetFilename'))",
 										"type": "Expression"
 									},
 									"par_deleteFilesAfterCompletion": true
