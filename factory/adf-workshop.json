@@ -9,6 +9,10 @@
 			"par_historyStorageAccountName": {
 				"type": "string",
 				"value": "workhophistory"
+			},
+			"par_historyStorageAccountContainer": {
+				"type": "string",
+				"value": "adfhistory"
 			}
 		}
 	},
