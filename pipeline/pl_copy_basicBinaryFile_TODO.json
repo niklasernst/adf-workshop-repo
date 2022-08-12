@@ -1,5 +1,5 @@
 {
-	"name": "pl_copy_basicBinaryFileAdls",
+	"name": "pl_copy_basicBinaryFile_TODO",
 	"properties": {
 		"activities": [
 			{
@@ -21,10 +21,7 @@
 						"storeSettings": {
 							"type": "AzureBlobFSReadSettings",
 							"recursive": false,
-							"deleteFilesAfterCompletion": {
-								"value": "@pipeline().parameters.par_deleteFilesAfterCompletion",
-								"type": "Expression"
-							}
+							"deleteFilesAfterCompletion": false
 						},
 						"formatSettings": {
 							"type": "BinaryReadSettings"
@@ -43,49 +40,13 @@
 				"inputs": [
 					{
 						"referenceName": "ds_adlsBinaryFile",
-						"type": "DatasetReference",
-						"parameters": {
-							"par_storageAccount": {
-								"value": "@pipeline().parameters.par_sourceStorageAccount",
-								"type": "Expression"
-							},
-							"par_container": {
-								"value": "@pipeline().parameters.par_sourceContainer",
-								"type": "Expression"
-							},
-							"par_directory": {
-								"value": "@pipeline().parameters.par_sourceDirectory",
-								"type": "Expression"
-							},
-							"par_filename": {
-								"value": "@pipeline().parameters.par_sourceFileName",
-								"type": "Expression"
-							}
-						}
+						"type": "DatasetReference"
 					}
 				],
 				"outputs": [
 					{
 						"referenceName": "ds_adlsBinaryFile",
-						"type": "DatasetReference",
-						"parameters": {
-							"par_storageAccount": {
-								"value": "@pipeline().parameters.par_targetStorageAccount",
-								"type": "Expression"
-							},
-							"par_container": {
-								"value": "@pipeline().parameters.par_targetContainer",
-								"type": "Expression"
-							},
-							"par_directory": {
-								"value": "@pipeline().parameters.par_targetDirectory",
-								"type": "Expression"
-							},
-							"par_filename": {
-								"value": "@pipeline().parameters.par_targetFileName",
-								"type": "Expression"
-							}
-						}
+						"type": "DatasetReference"
 					}
 				]
 			},
@@ -93,14 +54,7 @@
 				"name": "executePipeline_writeErrorLog",
 				"description": "Pass error information to pl_writeLogToQueue and execute it.",
 				"type": "ExecutePipeline",
-				"dependsOn": [
-					{
-						"activity": "copy_binaryFileAdlsToAdls",
-						"dependencyConditions": [
-							"Failed"
-						]
-					}
-				],
+				"dependsOn": [],
 				"userProperties": [],
 				"typeProperties": {
 					"pipeline": {
@@ -111,13 +65,48 @@
 					"parameters": {
 						"par_logType": "Error",
 						"par_logId": {
-							"value": "@activity('copy_binaryFileAdlsToAdls').Error.errorCode",
+							"value": "@activity('EnterActivityNameHere').Error.errorCode",
 							"type": "Expression"
 						},
 						"par_logMessage": {
-							"value": "@activity('copy_binaryFileAdlsToAdls').Error.message",
+							"value": "@activity('EnterActivityNameHere').Error.message",
 							"type": "Expression"
 						},
+						"par_jobName": {
+							"value": "@pipeline().Pipeline",
+							"type": "Expression"
+						},
+						"par_jobId": {
+							"value": "@pipeline().parameters.par_jobId",
+							"type": "Expression"
+						},
+						"par_jobRunId": {
+							"value": "@pipeline().RunId",
+							"type": "Expression"
+						},
+						"par_parentJobRunId": {
+							"value": "@pipeline()?.TriggeredByPipelineRunId",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "executePipeline_writeSuccessLog",
+				"description": "Pass error information to pl_writeLogToQueue and execute it.",
+				"type": "ExecutePipeline",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "pl_writeLogToQueue",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": false,
+					"parameters": {
+						"par_logType": "Success",
+						"par_logId": "FILE COPIED",
+						"par_logMessage": "File was successfully copied",
 						"par_jobName": {
 							"value": "@pipeline().Pipeline",
 							"type": "Expression"
@@ -140,38 +129,15 @@
 		],
 		"parameters": {
 			"par_jobId": {
-				"type": "string"
-			},
-			"par_sourceStorageAccount": {
-				"type": "string"
-			},
-			"par_sourceContainer": {
-				"type": "string"
-			},
-			"par_sourceDirectory": {
-				"type": "string"
-			},
-			"par_sourceFilename": {
-				"type": "string"
-			},
-			"par_targetStorageAccount": {
-				"type": "string"
-			},
-			"par_targetContainer": {
-				"type": "string"
-			},
-			"par_targetDirectory": {
-				"type": "string"
-			},
-			"par_targetFileName": {
-				"type": "string"
+				"type": "string",
+				"defaultValue": "Übung1"
 			},
 			"par_deleteFilesAfterCompletion": {
 				"type": "bool"
 			}
 		},
 		"folder": {
-			"name": "AMIS/4_Shared/Archiving"
+			"name": "Übung1"
 		},
 		"annotations": []
 	}

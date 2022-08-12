@@ -67,51 +67,12 @@
 			{
 				"name": "setVar_messageText",
 				"type": "SetVariable",
-				"dependsOn": [
-					{
-						"activity": "setVar_mandatoryText",
-						"dependencyConditions": [
-							"Succeeded"
-						]
-					},
-					{
-						"activity": "setVar_snowTicketText",
-						"dependencyConditions": [
-							"Succeeded"
-						]
-					}
-				],
+				"dependsOn": [],
 				"userProperties": [],
 				"typeProperties": {
 					"variableName": "var_messageText",
 					"value": {
-						"value": "@if(equals(pipeline().parameters.par_logType, 'Error'),concat(variables('var_mandatoryText'),variables('var_snowTicketText')), variables('var_mandatoryText'))",
-						"type": "Expression"
-					}
-				}
-			},
-			{
-				"name": "setVar_mandatoryText",
-				"type": "SetVariable",
-				"dependsOn": [],
-				"userProperties": [],
-				"typeProperties": {
-					"variableName": "var_mandatoryText",
-					"value": {
-						"value": "@concat('logType: ', pipeline().parameters.par_logType,'\njobId: ', pipeline().parameters.par_jobId,'\nlogMessage: ', pipeline().parameters.par_logMessage,'\njobName: ', pipeline().parameters.par_jobName,'\njobId: ', pipeline().parameters.par_jobId,'\njobRunId: ', pipeline().parameters.par_jobRunId,'\ngroupId', pipeline().parameters.par_groupId,'\ntriggerId', pipeline().parameters.par_triggerId,'\ntriggerName', pipeline().parameters.par_triggerName,'\ntriggerTime', pipeline().parameters.par_triggerTime,'\nparentJobRunId: ', pipeline().parameters.par_parentJobRunId)",
-						"type": "Expression"
-					}
-				}
-			},
-			{
-				"name": "setVar_snowTicketText",
-				"type": "SetVariable",
-				"dependsOn": [],
-				"userProperties": [],
-				"typeProperties": {
-					"variableName": "var_snowTicketText",
-					"value": {
-						"value": "@concat('impact: ', pipeline().parameters.par_impact,'\nurgency: ', pipeline().parameters.par_urgency,'\ntitle: ', pipeline().parameters.par_ticketTitle,'\nmessage: ', pipeline().parameters.par_ticketDescription,'\nrecipient: ', pipeline().parameters.par_recipientLeanIxId,'\nbusinessSupportGroup: ', pipeline().parameters.par_businessSupportGroup,'\nbusinessSupportGroup: ', pipeline().parameters.par_technicalSupportGroup)",
+						"value": "@concat('kürzel: ',pipeline().globalParameters.par_kürzel,'\r\nlogType: ', pipeline().parameters.par_logType,'\r\njobId: ', pipeline().parameters.par_jobId,'\r\nlogMessage: ', pipeline().parameters.par_logMessage,'\r\njobName: ', pipeline().parameters.par_jobName,'\r\njobId: ', pipeline().parameters.par_jobId,'\r\njobRunId: ', pipeline().parameters.par_jobRunId,'\r\nparentJobRunId: ', pipeline().parameters.par_parentJobRunId)",
 						"type": "Expression"
 					}
 				}
@@ -136,63 +97,17 @@
 			"par_jobRunId": {
 				"type": "string"
 			},
-			"par_groupId": {
-				"type": "string"
-			},
-			"par_triggerId": {
-				"type": "string"
-			},
-			"par_triggerName": {
-				"type": "string"
-			},
-			"par_triggerTime": {
-				"type": "string"
-			},
 			"par_parentJobRunId": {
 				"type": "string"
-			},
-			"par_impact": {
-				"type": "string",
-				"defaultValue": null
-			},
-			"par_urgency": {
-				"type": "string",
-				"defaultValue": null
-			},
-			"par_ticketTitle": {
-				"type": "string",
-				"defaultValue": null
-			},
-			"par_ticketDescription": {
-				"type": "string",
-				"defaultValue": null
-			},
-			"par_recipientLeanIxId": {
-				"type": "string",
-				"defaultValue": null
-			},
-			"par_businessSupportGroup": {
-				"type": "string",
-				"defaultValue": null
-			},
-			"par_technicalSupportGroup": {
-				"type": "string",
-				"defaultValue": null
 			}
 		},
 		"variables": {
 			"var_messageText": {
 				"type": "String"
-			},
-			"var_mandatoryText": {
-				"type": "String"
-			},
-			"var_snowTicketText": {
-				"type": "String"
 			}
 		},
 		"folder": {
-			"name": "4_Shared/Logging and Alerting"
+			"name": "AMIS/4_Shared/Logging and Alerting"
 		},
 		"annotations": []
 	}

@@ -24,7 +24,7 @@
 			},
 			"par_akvSasTokenUrlForWritingToQueue": {
 				"type": "string",
-				"value": "TODO"
+				"value": "https://akvworkshopdevl.vault.azure.net/secrets/metadatasastokendevl/6d4ecf658a994df59d189a24038abd75"
 			},
 			"par_archiveStorageAccountName": {
 				"type": "string",
@@ -61,6 +61,10 @@
 			"par_schemaFileStorageAccountDirectory": {
 				"type": "string",
 				"value": "flowjobschema"
+			},
+			"par_kürzel": {
+				"type": "string",
+				"value": "TODO"
 			}
 		}
 	},

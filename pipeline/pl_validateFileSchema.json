@@ -94,36 +94,14 @@
 							"value": "@pipeline().RunId",
 							"type": "Expression"
 						},
-						"par_groupId": {
-							"value": "@pipeline().GroupId",
-							"type": "Expression"
-						},
-						"par_triggerId": {
-							"value": "@pipeline().TriggerId",
-							"type": "Expression"
-						},
-						"par_triggerName": {
-							"value": "@pipeline().TriggerName",
-							"type": "Expression"
-						},
-						"par_triggerTime": {
-							"value": "@pipeline().TriggerTime",
-							"type": "Expression"
-						},
 						"par_parentJobRunId": {
 							"value": "@pipeline()?.TriggeredByPipelineRunId",
 							"type": "Expression"
 						},
-						"par_impact": "3",
-						"par_urgency": "3",
-						"par_ticketTitle": "Reading JSON config file is not working.",
-						"par_ticketDescription": {
-							"value": "@concat('Reading of JSON config file from metadata storage account is not working. Please resolve issue as soon as possible. Error message: ',activity('lookup_obtainJsonConfigFile').Error.message)",
+						"par_kürzel": {
+							"value": "@pipeline().globalParameters.par_kürzel",
 							"type": "Expression"
-						},
-						"par_recipientLeanIxId": "null",
-						"par_businessSupportGroup": "null",
-						"par_technicalSupportGroup": "null"
+						}
 					}
 				}
 			},
@@ -355,36 +333,10 @@
 												"value": "@pipeline().RunId",
 												"type": "Expression"
 											},
-											"par_groupId": {
-												"value": "@pipeline().GroupId",
-												"type": "Expression"
-											},
-											"par_triggerId": {
-												"value": "@pipeline().TriggerId",
-												"type": "Expression"
-											},
-											"par_triggerName": {
-												"value": "@pipeline().TriggerName",
-												"type": "Expression"
-											},
-											"par_triggerTime": {
-												"value": "@pipeline().TriggerTime",
-												"type": "Expression"
-											},
 											"par_parentJobRunId": {
 												"value": "@pipeline()?.TriggeredByPipelineRunId",
 												"type": "Expression"
-											},
-											"par_impact": "3",
-											"par_urgency": "3",
-											"par_ticketTitle": "Reading schema config file is not working.",
-											"par_ticketDescription": {
-												"value": "@concat('Reading of schema config file from metadata storage account is not working. Please resolve issue as soon as possible. Error message: ',activity('getMetadata_ofCsvSchemaFile').Error.message)",
-												"type": "Expression"
-											},
-											"par_recipientLeanIxId": "null",
-											"par_businessSupportGroup": "null",
-											"par_technicalSupportGroup": "null"
+											}
 										}
 									}
 								},
@@ -429,36 +381,10 @@
 												"value": "@pipeline().RunId",
 												"type": "Expression"
 											},
-											"par_groupId": {
-												"value": "@pipeline().GroupId",
-												"type": "Expression"
-											},
-											"par_triggerId": {
-												"value": "@pipeline().TriggerId",
-												"type": "Expression"
-											},
-											"par_triggerName": {
-												"value": "@pipeline().TriggerName",
-												"type": "Expression"
-											},
-											"par_triggerTime": {
-												"value": "@pipeline().TriggerTime",
-												"type": "Expression"
-											},
 											"par_parentJobRunId": {
 												"value": "@pipeline()?.TriggeredByPipelineRunId",
 												"type": "Expression"
-											},
-											"par_impact": "2",
-											"par_urgency": "2",
-											"par_ticketTitle": "Reading schema of file is not working.",
-											"par_ticketDescription": {
-												"value": "@concat('Reading schema of file is not working. Please resolve issue as soon as possible. Error message: ',activity('getMetadata_ofCsvFileToValidate').Error.message)",
-												"type": "Expression"
-											},
-											"par_recipientLeanIxId": "null",
-											"par_businessSupportGroup": "null",
-											"par_technicalSupportGroup": "null"
+											}
 										}
 									}
 								},
@@ -626,36 +552,10 @@
 												"value": "@pipeline().RunId",
 												"type": "Expression"
 											},
-											"par_groupId": {
-												"value": "@pipeline().GroupId",
-												"type": "Expression"
-											},
-											"par_triggerId": {
-												"value": "@pipeline().TriggerId",
-												"type": "Expression"
-											},
-											"par_triggerName": {
-												"value": "@pipeline().TriggerName",
-												"type": "Expression"
-											},
-											"par_triggerTime": {
-												"value": "@pipeline().TriggerTime",
-												"type": "Expression"
-											},
 											"par_parentJobRunId": {
 												"value": "@pipeline()?.TriggeredByPipelineRunId",
 												"type": "Expression"
-											},
-											"par_impact": "3",
-											"par_urgency": "3",
-											"par_ticketTitle": "Reading schema config file is not working.",
-											"par_ticketDescription": {
-												"value": "@concat('Reading of schema config file from metadata storage account is not working. Please resolve issue as soon as possible. Error message: ',activity('getMetadata_ofParquetSchemaFile').Error.message)",
-												"type": "Expression"
-											},
-											"par_recipientLeanIxId": "null",
-											"par_businessSupportGroup": "null",
-											"par_technicalSupportGroup": "null"
+											}
 										}
 									}
 								},
@@ -700,36 +600,10 @@
 												"value": "@pipeline().RunId",
 												"type": "Expression"
 											},
-											"par_groupId": {
-												"value": "@pipeline().GroupId",
-												"type": "Expression"
-											},
-											"par_triggerId": {
-												"value": "@pipeline().TriggerId",
-												"type": "Expression"
-											},
-											"par_triggerName": {
-												"value": "@pipeline().TriggerName",
-												"type": "Expression"
-											},
-											"par_triggerTime": {
-												"value": "@pipeline().TriggerTime",
-												"type": "Expression"
-											},
 											"par_parentJobRunId": {
 												"value": "@pipeline()?.TriggeredByPipelineRunId",
 												"type": "Expression"
-											},
-											"par_impact": "2",
-											"par_urgency": "2",
-											"par_ticketTitle": "Reading schema of file is not working.",
-											"par_ticketDescription": {
-												"value": "@concat('Reading schema of file is not working. Please resolve issue as soon as possible. Error message: ',activity('getMetadata_ofParquetFileToValidate').Error.message)",
-												"type": "Expression"
-											},
-											"par_recipientLeanIxId": "null",
-											"par_businessSupportGroup": "null",
-											"par_technicalSupportGroup": "null"
+											}
 										}
 									}
 								},
@@ -852,7 +726,7 @@
 			}
 		},
 		"folder": {
-			"name": "4_Shared/Schema Validation"
+			"name": "AMIS/4_Shared/Schema Validation"
 		},
 		"annotations": []
 	}

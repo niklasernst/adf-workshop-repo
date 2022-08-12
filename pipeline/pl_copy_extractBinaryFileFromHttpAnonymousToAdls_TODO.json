@@ -1,5 +1,5 @@
 {
-	"name": "pl_copy_extractBinaryFileFromHttpAnonymousToAdls",
+	"name": "pl_copy_extractBinaryFileFromHttpAnonymousToAdls_TODO",
 	"properties": {
 		"activities": [
 			{
@@ -152,7 +152,7 @@
 							"typeProperties": {
 								"variableName": "var_targetFilename",
 								"value": {
-									"value": "@concat(activity('lookup_obtainJsonConfigFile').output.firstRow.targetFilePrefix,if(activity('lookup_obtainJsonConfigFile').output.firstRow.addTimestampFlag, formatDateTime(utcnow(),activity('lookup_obtainJsonConfigFile').output.firstRow.setTimestampformat),''),activity('lookup_obtainJsonConfigFile').output.firstRow.targetFileExtension)",
+									"value": "@concat('TODO','.csv')",
 									"type": "Expression"
 								}
 							}
@@ -481,7 +481,7 @@
 								"type": "Expression"
 							},
 							"par_directory": {
-								"value": "@variables('var_targetDirectory')",
+								"value": "@concat(variables('var_targetDirectory'),pipeline().globalParameters.par_kürzel)",
 								"type": "Expression"
 							},
 							"par_filename": {
@@ -507,7 +507,7 @@
 				"userProperties": [],
 				"typeProperties": {
 					"expression": {
-						"value": "@activity('lookup_obtainJsonConfigFile').output.firstRow.archiveTargetFlag",
+						"value": "@and(true,false)",
 						"type": "Expression"
 					},
 					"ifTrueActivities": [
@@ -521,7 +521,7 @@
 									"referenceName": "pl_copy_basicBinaryFileAdls",
 									"type": "PipelineReference"
 								},
-								"waitOnCompletion": false,
+								"waitOnCompletion": true,
 								"parameters": {
 									"par_jobId": {
 										"value": "@pipeline().parameters.par_jobId",
@@ -536,7 +536,7 @@
 										"type": "Expression"
 									},
 									"par_sourceDirectory": {
-										"value": "@variables('var_targetDirectory')",
+										"value": "@concat(variables('var_targetDirectory'),pipeline().globalParameters.par_kürzel)",
 										"type": "Expression"
 									},
 									"par_sourceFilename": {
@@ -556,23 +556,10 @@
 										"type": "Expression"
 									},
 									"par_targetFileName": {
-										"value": "@variables('var_targetFilename')",
+										"value": "@concat(pipeline().globalParameters.par_kürzel,'_',variables('var_targetFilename'))",
 										"type": "Expression"
 									},
-									"par_deleteFilesAfterCompletion": false,
-									"par_impact": "2",
-									"par_urgency": "2",
-									"par_ticketTitle": "Archiving target file to history failed.",
-									"par_ticketDescription": "Archiving the successfuly copied target file to the history container failed.",
-									"par_recipientLeanIxId": "null",
-									"par_businessSupportGroup": {
-										"value": "@activity('lookup_obtainJsonConfigFile').output.firstRow.businessNotification",
-										"type": "Expression"
-									},
-									"par_technicalSupportGroup": {
-										"value": "@activity('lookup_obtainJsonConfigFile').output.firstRow.technicalNotification",
-										"type": "Expression"
-									}
+									"par_deleteFilesAfterCompletion": true
 								}
 							}
 						}
@@ -866,7 +853,7 @@
 			}
 		},
 		"folder": {
-			"name": "AMIS/1_Ingestion/HTTP"
+			"name": "Übung 3"
 		},
 		"annotations": [],
 		"lastPublishTime": "2022-04-13T10:07:16Z"

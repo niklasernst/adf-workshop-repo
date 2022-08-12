@@ -1,5 +1,5 @@
 {
-	"name": "pl_delete_basicBinaryFileAdls",
+	"name": "pl_delete_basicBinaryFile",
 	"properties": {
 		"activities": [
 			{
@@ -35,10 +35,7 @@
 							"value": "@pipeline().Pipeline",
 							"type": "Expression"
 						},
-						"par_jobId": {
-							"value": "@pipeline().parameters.par_jobId",
-							"type": "Expression"
-						},
+						"par_jobId": "Übung 0",
 						"par_jobRunId": {
 							"value": "@pipeline().RunId",
 							"type": "Expression"
@@ -67,18 +64,9 @@
 						"referenceName": "ds_adlsBinaryFile",
 						"type": "DatasetReference",
 						"parameters": {
-							"par_storageAccount": {
-								"value": "@pipeline().parameters.par_storageAccount",
-								"type": "Expression"
-							},
-							"par_container": {
-								"value": "@pipeline().parameters.par_container",
-								"type": "Expression"
-							},
-							"par_directory": {
-								"value": "@pipeline().parameters.par_directory",
-								"type": "Expression"
-							},
+							"par_storageAccount": "workshopinbounddevl",
+							"par_container": "landing",
+							"par_directory": "deleteme",
 							"par_filename": {
 								"value": "@pipeline().parameters.par_filename",
 								"type": "Expression"
@@ -92,27 +80,57 @@
 						"enablePartitionDiscovery": false
 					}
 				}
+			},
+			{
+				"name": "executePipeline_writeSuccessLog",
+				"description": "Pass error information to pl_writeLogToQueue and execute it.",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "delete_binaryFileAdls",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "pl_writeLogToQueue",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": false,
+					"parameters": {
+						"par_logType": "Success",
+						"par_logId": "FILE DELETED",
+						"par_logMessage": {
+							"value": "@concat(pipeline().parameters.par_filename, ' was deleted!')",
+							"type": "Expression"
+						},
+						"par_jobName": {
+							"value": "@pipeline().Pipeline",
+							"type": "Expression"
+						},
+						"par_jobId": "Übung 0",
+						"par_jobRunId": {
+							"value": "@pipeline().RunId",
+							"type": "Expression"
+						},
+						"par_parentJobRunId": {
+							"value": "@pipeline()?.TriggeredByPipelineRunId",
+							"type": "Expression"
+						}
+					}
+				}
 			}
 		],
 		"parameters": {
-			"par_jobId": {
-				"type": "string"
-			},
-			"par_storageAccount": {
-				"type": "string"
-			},
-			"par_container": {
-				"type": "string"
-			},
-			"par_directory": {
-				"type": "string"
-			},
 			"par_filename": {
 				"type": "string"
 			}
 		},
 		"folder": {
-			"name": "AMIS/4_Shared/Deleting"
+			"name": "Übung1"
 		},
 		"annotations": []
 	}
