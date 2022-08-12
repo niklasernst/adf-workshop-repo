@@ -61,6 +61,10 @@
 			"par_defaultMappingFileName": {
 				"type": "string",
 				"value": "mappingDefault.json"
+			},
+			"par_kürzel": {
+				"type": "string",
+				"value": "TODO"
 			}
 		}
 	},
