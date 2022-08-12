@@ -21,7 +21,10 @@
 						"storeSettings": {
 							"type": "AzureBlobFSReadSettings",
 							"recursive": false,
-							"deleteFilesAfterCompletion": false
+							"deleteFilesAfterCompletion": {
+								"value": "@pipeline().parameters.par_deleteFilesAfterCompletion",
+								"type": "Expression"
+							}
 						},
 						"formatSettings": {
 							"type": "BinaryReadSettings"
