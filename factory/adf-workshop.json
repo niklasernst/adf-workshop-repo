@@ -65,6 +65,10 @@
 			"par_kürzel": {
 				"type": "string",
 				"value": "erni"
+			},
+			"par_metadataContainerTask2": {
+				"type": "string",
+				"value": "putyourfileshere"
 			}
 		}
 	},
