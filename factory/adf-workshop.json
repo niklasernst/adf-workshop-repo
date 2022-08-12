@@ -5,6 +5,10 @@
 			"par_environment": {
 				"type": "string",
 				"value": "devl"
+			},
+			"par_historyStorageAccountName": {
+				"type": "string",
+				"value": "workhophistory"
 			}
 		}
 	},
