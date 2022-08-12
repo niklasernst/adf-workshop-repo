@@ -57,6 +57,10 @@
 			"par_failedContainerName": {
 				"type": "string",
 				"value": "failed"
+			},
+			"par_defaultMappingFileName": {
+				"type": "string",
+				"value": "mappingDefault.json"
 			}
 		}
 	},
