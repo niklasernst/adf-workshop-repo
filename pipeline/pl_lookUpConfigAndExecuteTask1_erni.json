@@ -1,5 +1,5 @@
 {
-	"name": "pl_lookUpConfigAndExecuteTask1_erni",
+	"name": "pl_lookUpConfigAndExecuteTask1_erni_copy1",
 	"properties": {
 		"activities": [
 			{
@@ -31,8 +31,14 @@
 						"referenceName": "ds_adlsJsonFile",
 						"type": "DatasetReference",
 						"parameters": {
-							"par_storageAccount": "t",
-							"par_container": "t",
+							"par_storageAccount": {
+								"value": "@concat(pipeline().globalParameters.par_metadataStorageAccountName,pipeline().globalParameters.par_environment)",
+								"type": "Expression"
+							},
+							"par_container": {
+								"value": "@pipeline().globalParameters.par_metadataContainerTask2",
+								"type": "Expression"
+							},
 							"par_directory": {
 								"value": "@pipeline().globalParameters.par_kürzel",
 								"type": "Expression"
@@ -54,7 +60,7 @@
 					{
 						"activity": "lookup_obtainJsonConfigFile",
 						"dependencyConditions": [
-							"Succeeded"
+							"Failed"
 						]
 					}
 				],
@@ -133,10 +139,63 @@
 			{
 				"name": "executePipeline_task1",
 				"type": "ExecutePipeline",
-				"dependsOn": [],
+				"dependsOn": [
+					{
+						"activity": "lookup_obtainJsonConfigFile",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
 				"userProperties": [],
 				"typeProperties": {
-					"waitOnCompletion": true
+					"pipeline": {
+						"referenceName": "pl_copy_basicBinaryFile_erni_copy1",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true,
+					"parameters": {
+						"par_jobId": {
+							"value": "@pipeline().parameters.par_jobId",
+							"type": "Expression"
+						},
+						"par_deleteFilesAfterCompletion": {
+							"value": "@activity('lookup_obtainJsonConfigFile').output.firstRow.deleteAfterCopyFlag",
+							"type": "Expression"
+						},
+						"par_sourceStorageAccount": {
+							"value": "@activity('lookup_obtainJsonConfigFile').output.firstRow.adlsSource.storageAccount",
+							"type": "Expression"
+						},
+						"par_sourceContainer": {
+							"value": "@activity('lookup_obtainJsonConfigFile').output.firstRow.adlsSource.container",
+							"type": "Expression"
+						},
+						"par_sourceDirectory": {
+							"value": "@activity('lookup_obtainJsonConfigFile').output.firstRow.adlsSource.directory",
+							"type": "Expression"
+						},
+						"par_sourceFileName": {
+							"value": "@activity('lookup_obtainJsonConfigFile').output.firstRow.adlsSource.filename",
+							"type": "Expression"
+						},
+						"par_targetStorageAccount": {
+							"value": "@activity('lookup_obtainJsonConfigFile').output.firstRow.adlsTarget.storageAccount",
+							"type": "Expression"
+						},
+						"par_targetContainer": {
+							"value": "@activity('lookup_obtainJsonConfigFile').output.firstRow.adlsTarget.container",
+							"type": "Expression"
+						},
+						"par_targetDirectory": {
+							"value": "@activity('lookup_obtainJsonConfigFile').output.firstRow.adlsSource.directory",
+							"type": "Expression"
+						},
+						"par_targetFileName": {
+							"value": "@activity('lookup_obtainJsonConfigFile').output.firstRow.adlsSource.filename",
+							"type": "Expression"
+						}
+					}
 				}
 			}
 		],

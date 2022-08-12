@@ -1,5 +1,5 @@
 {
-	"name": "pl_copy_basicBinaryFile_erni",
+	"name": "pl_copy_basicBinaryFile_erni_copy1",
 	"properties": {
 		"activities": [
 			{
@@ -21,7 +21,10 @@
 						"storeSettings": {
 							"type": "AzureBlobFSReadSettings",
 							"recursive": false,
-							"deleteFilesAfterCompletion": false
+							"deleteFilesAfterCompletion": {
+								"value": "@pipeline().parameters.par_deleteFilesAfterCompletion",
+								"type": "Expression"
+							}
 						},
 						"formatSettings": {
 							"type": "BinaryReadSettings"
@@ -40,13 +43,49 @@
 				"inputs": [
 					{
 						"referenceName": "ds_adlsBinaryFile",
-						"type": "DatasetReference"
+						"type": "DatasetReference",
+						"parameters": {
+							"par_storageAccount": {
+								"value": "@concat(pipeline().parameters.par_sourceStorageAccount,pipeline().globalParameters.par_environment)",
+								"type": "Expression"
+							},
+							"par_container": {
+								"value": "@pipeline().parameters.par_sourceContainer",
+								"type": "Expression"
+							},
+							"par_directory": {
+								"value": "@pipeline().parameters.par_sourceDirectory",
+								"type": "Expression"
+							},
+							"par_filename": {
+								"value": "@pipeline().parameters.par_sourceFileName",
+								"type": "Expression"
+							}
+						}
 					}
 				],
 				"outputs": [
 					{
 						"referenceName": "ds_adlsBinaryFile",
-						"type": "DatasetReference"
+						"type": "DatasetReference",
+						"parameters": {
+							"par_storageAccount": {
+								"value": "@concat(pipeline().parameters.par_targetStorageAccount,pipeline().globalParameters.par_environment)",
+								"type": "Expression"
+							},
+							"par_container": {
+								"value": "@pipeline().parameters.par_targetContainer",
+								"type": "Expression"
+							},
+							"par_directory": {
+								"value": "@pipeline().parameters.par_targetDirectory",
+								"type": "Expression"
+							},
+							"par_filename": {
+								"value": "@pipeline().parameters.par_targetFileName",
+								"type": "Expression"
+							}
+						}
 					}
 				]
 			},
@@ -54,7 +93,14 @@
 				"name": "executePipeline_writeErrorLog",
 				"description": "Pass error information to pl_writeLogToQueue and execute it.",
 				"type": "ExecutePipeline",
-				"dependsOn": [],
+				"dependsOn": [
+					{
+						"activity": "copy_binaryFileAdlsToAdls",
+						"dependencyConditions": [
+							"Failed"
+						]
+					}
+				],
 				"userProperties": [],
 				"typeProperties": {
 					"pipeline": {
@@ -65,11 +111,11 @@
 					"parameters": {
 						"par_logType": "Error",
 						"par_logId": {
-							"value": "@activity('EnterActivityNameHere').Error.errorCode",
+							"value": "@activity('copy_binaryFileAdlsToAdls').Error.errorCode",
 							"type": "Expression"
 						},
 						"par_logMessage": {
-							"value": "@activity('EnterActivityNameHere').Error.message",
+							"value": "@activity('copy_binaryFileAdlsToAdls').Error.message",
 							"type": "Expression"
 						},
 						"par_jobName": {
@@ -95,7 +141,14 @@
 				"name": "executePipeline_writeSuccessLog",
 				"description": "Pass error information to pl_writeLogToQueue and execute it.",
 				"type": "ExecutePipeline",
-				"dependsOn": [],
+				"dependsOn": [
+					{
+						"activity": "copy_binaryFileAdlsToAdls",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
 				"userProperties": [],
 				"typeProperties": {
 					"pipeline": {
@@ -130,10 +183,43 @@
 		"parameters": {
 			"par_jobId": {
 				"type": "string",
-				"defaultValue": "Übung1"
+				"defaultValue": "task1"
 			},
 			"par_deleteFilesAfterCompletion": {
-				"type": "bool"
+				"type": "bool",
+				"defaultValue": false
+			},
+			"par_sourceStorageAccount": {
+				"type": "string",
+				"defaultValue": "workshopinbound"
+			},
+			"par_sourceContainer": {
+				"type": "string",
+				"defaultValue": "landing"
+			},
+			"par_sourceDirectory": {
+				"type": "string",
+				"defaultValue": "task1"
+			},
+			"par_sourceFileName": {
+				"type": "string",
+				"defaultValue": "onlyCopyMe.txt"
+			},
+			"par_targetStorageAccount": {
+				"type": "string",
+				"defaultValue": "workshopinbound"
+			},
+			"par_targetContainer": {
+				"type": "string",
+				"defaultValue": "landingerni"
+			},
+			"par_targetDirectory": {
+				"type": "string",
+				"defaultValue": "task1"
+			},
+			"par_targetFileName": {
+				"type": "string",
+				"defaultValue": "nowOpenMe.txt"
 			}
 		},
 		"folder": {
