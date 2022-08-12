@@ -54,14 +54,7 @@
 				"name": "executePipeline_writeErrorLog",
 				"description": "Pass error information to pl_writeLogToQueue and execute it.",
 				"type": "ExecutePipeline",
-				"dependsOn": [
-					{
-						"activity": "copy_binaryFileAdlsToAdls",
-						"dependencyConditions": [
-							"Failed"
-						]
-					}
-				],
+				"dependsOn": [],
 				"userProperties": [],
 				"typeProperties": {
 					"pipeline": {
@@ -102,14 +95,7 @@
 				"name": "executePipeline_writeSuccessLog",
 				"description": "Pass error information to pl_writeLogToQueue and execute it.",
 				"type": "ExecutePipeline",
-				"dependsOn": [
-					{
-						"activity": "copy_binaryFileAdlsToAdls",
-						"dependencyConditions": [
-							"Succeeded"
-						]
-					}
-				],
+				"dependsOn": [],
 				"userProperties": [],
 				"typeProperties": {
 					"pipeline": {
@@ -148,25 +134,6 @@
 			},
 			"par_deleteFilesAfterCompletion": {
 				"type": "bool"
-			},
-			"par_sourceStorageAccount": {
-				"type": "string",
-				"defaultValue": "workshopinbound"
-			},
-			"par_sourceContainer": {
-				"type": "string",
-				"defaultValue": "landing"
-			},
-			"par_sourceFilename": {
-				"type": "string",
-				"defaultValue": "onlyCopyMe.txt"
-			},
-			"par_sourcedirectory": {
-				"type": "string",
-				"defaultValue": "task1"
-			},
-			"par_targetStorageAccount": {
-				"type": "string"
 			}
 		},
 		"folder": {
