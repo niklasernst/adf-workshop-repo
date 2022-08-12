@@ -152,7 +152,7 @@
 							"typeProperties": {
 								"variableName": "var_targetFilename",
 								"value": {
-									"value": "@concat('TODO','.csv')",
+									"value": "@concat(activity('lookup_obtainJsonConfigFile').output.firstRow.targetFilePrefix,if(activity('lookup_obtainJsonConfigFile').output.firstRow.addTimestampFlag, formatDateTime(utcnow(),activity('lookup_obtainJsonConfigFile').output.firstRow.setTimestampformat),''),activity('lookup_obtainJsonConfigFile').output.firstRow.targetFileExtension)",
 									"type": "Expression"
 								}
 							}
@@ -507,7 +507,7 @@
 				"userProperties": [],
 				"typeProperties": {
 					"expression": {
-						"value": "@and(true,false)",
+						"value": "@activity('lookup_obtainJsonConfigFile').output.firstRow.archiveTargetFlag",
 						"type": "Expression"
 					},
 					"ifTrueActivities": [
@@ -559,7 +559,7 @@
 										"value": "@concat(pipeline().globalParameters.par_kürzel,'_',variables('var_targetFilename'))",
 										"type": "Expression"
 									},
-									"par_deleteFilesAfterCompletion": true
+									"par_deleteFilesAfterCompletion": false
 								}
 							}
 						}
