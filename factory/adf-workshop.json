@@ -33,6 +33,10 @@
 			"par_metadataStorageAccountName": {
 				"type": "string",
 				"value": "workshopmetadata"
+			},
+			"par_archiveStorageAccountName": {
+				"type": "string",
+				"value": "workshophistory"
 			}
 		}
 	},
