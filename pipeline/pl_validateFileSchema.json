@@ -707,13 +707,16 @@
 		],
 		"parameters": {
 			"par_filename": {
-				"type": "string"
+				"type": "string",
+				"defaultValue": "snbgc_20220811_191405.csv"
 			},
 			"par_jobId": {
-				"type": "string"
+				"type": "string",
+				"defaultValue": "http-1_PRC"
 			},
 			"par_isSourceFile": {
-				"type": "bool"
+				"type": "bool",
+				"defaultValue": true
 			}
 		},
 		"variables": {
