@@ -1,0 +1,213 @@
+{
+	"name": "pl_lookUpConfigAndExecuteTask1_erni_copy1",
+	"properties": {
+		"activities": [
+			{
+				"name": "lookup_obtainJsonConfigFile",
+				"description": "Looks up json config files to obtain job parameters.",
+				"type": "Lookup",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.01:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "JsonSource",
+						"storeSettings": {
+							"type": "AzureBlobFSReadSettings",
+							"recursive": false,
+							"enablePartitionDiscovery": false
+						},
+						"formatSettings": {
+							"type": "JsonReadSettings"
+						}
+					},
+					"dataset": {
+						"referenceName": "ds_adlsJsonFile",
+						"type": "DatasetReference",
+						"parameters": {
+							"par_storageAccount": {
+								"value": "@concat(pipeline().globalParameters.par_metadataStorageAccountName,pipeline().globalParameters.par_environment)",
+								"type": "Expression"
+							},
+							"par_container": {
+								"value": "@pipeline().globalParameters.par_metadataContainerTask2",
+								"type": "Expression"
+							},
+							"par_directory": {
+								"value": "@pipeline().globalParameters.par_kürzel",
+								"type": "Expression"
+							},
+							"par_fileName": {
+								"value": "@concat(pipeline().parameters.par_jobId,'.json')",
+								"type": "Expression"
+							},
+							"par_encoding": "Default(UTF-8)"
+						}
+					}
+				}
+			},
+			{
+				"name": "executePipeline_writeErrorLog",
+				"description": "Pass error information to pl_writeLogToQueue and execute it.",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "lookup_obtainJsonConfigFile",
+						"dependencyConditions": [
+							"Failed"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "pl_writeLogToQueue",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": false,
+					"parameters": {
+						"par_logType": "Error",
+						"par_logId": {
+							"value": "@activity('lookup_obtainJsonConfigFile').Error.errorCode",
+							"type": "Expression"
+						},
+						"par_logMessage": {
+							"value": "@activity('lookup_obtainJsonConfigFile').Error.message",
+							"type": "Expression"
+						},
+						"par_jobName": {
+							"value": "@pipeline().Pipeline",
+							"type": "Expression"
+						},
+						"par_jobId": "Übung 2",
+						"par_jobRunId": {
+							"value": "@pipeline().RunId",
+							"type": "Expression"
+						},
+						"par_parentJobRunId": {
+							"value": "@pipeline()?.TriggeredByPipelineRunId",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "executePipeline_writeSuccessLog",
+				"description": "Pass error information to pl_writeLogToQueue and execute it.",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "executePipeline_task1",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "pl_writeLogToQueue",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": false,
+					"parameters": {
+						"par_logType": "Success",
+						"par_logId": "TASK 1 EXECUTED",
+						"par_logMessage": "Finished task 2",
+						"par_jobName": {
+							"value": "@pipeline().Pipeline",
+							"type": "Expression"
+						},
+						"par_jobId": "Übung 2",
+						"par_jobRunId": {
+							"value": "@pipeline().RunId",
+							"type": "Expression"
+						},
+						"par_parentJobRunId": {
+							"value": "@pipeline()?.TriggeredByPipelineRunId",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "executePipeline_task1",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "lookup_obtainJsonConfigFile",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "pl_copy_basicBinaryFile_erni_copy1",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true,
+					"parameters": {
+						"par_jobId": {
+							"value": "@pipeline().parameters.par_jobId",
+							"type": "Expression"
+						},
+						"par_deleteFilesAfterCompletion": {
+							"value": "@activity('lookup_obtainJsonConfigFile').output.firstRow.deleteAfterCopyFlag",
+							"type": "Expression"
+						},
+						"par_sourceStorageAccount": {
+							"value": "@activity('lookup_obtainJsonConfigFile').output.firstRow.adlsSource.storageAccount",
+							"type": "Expression"
+						},
+						"par_sourceContainer": {
+							"value": "@activity('lookup_obtainJsonConfigFile').output.firstRow.adlsSource.container",
+							"type": "Expression"
+						},
+						"par_sourceDirectory": {
+							"value": "@activity('lookup_obtainJsonConfigFile').output.firstRow.adlsSource.directory",
+							"type": "Expression"
+						},
+						"par_sourceFileName": {
+							"value": "@activity('lookup_obtainJsonConfigFile').output.firstRow.adlsSource.filename",
+							"type": "Expression"
+						},
+						"par_targetStorageAccount": {
+							"value": "@activity('lookup_obtainJsonConfigFile').output.firstRow.adlsTarget.storageAccount",
+							"type": "Expression"
+						},
+						"par_targetContainer": {
+							"value": "@activity('lookup_obtainJsonConfigFile').output.firstRow.adlsTarget.container",
+							"type": "Expression"
+						},
+						"par_targetDirectory": {
+							"value": "@activity('lookup_obtainJsonConfigFile').output.firstRow.adlsSource.directory",
+							"type": "Expression"
+						},
+						"par_targetFileName": {
+							"value": "@activity('lookup_obtainJsonConfigFile').output.firstRow.adlsSource.filename",
+							"type": "Expression"
+						}
+					}
+				}
+			}
+		],
+		"parameters": {
+			"par_jobId": {
+				"type": "string",
+				"defaultValue": "task2"
+			}
+		},
+		"folder": {
+			"name": "Übung 2"
+		},
+		"annotations": []
+	}
+}
