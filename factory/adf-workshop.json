@@ -49,6 +49,10 @@
 			"par_dataflowMappingStorageAccountDirectory": {
 				"type": "string",
 				"value": "flowjobmapping"
+			},
+			"par_schemaFileStorageAccountDirectory": {
+				"type": "string",
+				"value": "flowjobschema"
 			}
 		}
 	},
