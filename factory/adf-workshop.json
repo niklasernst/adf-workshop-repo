@@ -1,72 +1,9 @@
 {
 	"name": "adf-workshop",
-	"properties": {
-		"globalParameters": {
-			"par_environment": {
-				"type": "string",
-				"value": "devl"
-			},
-			"par_loggingStorageQueueName": {
-				"type": "string",
-				"value": "joberrors"
-			},
-			"par_jobmetadataStorageAccountContainer": {
-				"type": "string",
-				"value": "jobmetadata"
-			},
-			"par_metadataStorageAccountName": {
-				"type": "string",
-				"value": "workshopmetadata"
-			},
-			"par_dataflowConfigStorageAccountDirectory": {
-				"type": "string",
-				"value": "flowjobconfig"
-			},
-			"par_akvSasTokenUrlForWritingToQueue": {
-				"type": "string",
-				"value": "https://akvworkshopdevl.vault.azure.net/secrets/metadatasastokendevl/6d4ecf658a994df59d189a24038abd75"
-			},
-			"par_archiveStorageAccountName": {
-				"type": "string",
-				"value": "workshopmetadata"
-			},
-			"par_systemConfigStorageAccountDirectory": {
-				"type": "string",
-				"value": "systemconfig"
-			},
-			"par_adfLoggingStorageAccountName": {
-				"type": "string",
-				"value": "workshopmetadata"
-			},
-			"par_dataflowMappingStorageAccountDirectory": {
-				"type": "string",
-				"value": "flowjobmapping"
-			},
-			"par_failedContainerName": {
-				"type": "string",
-				"value": "failed"
-			},
-			"par_defaultMappingFileName": {
-				"type": "string",
-				"value": "mappingDefault.json"
-			},
-			"par_historyStorageAccountName": {
-				"type": "string",
-				"value": "workshophistory"
-			},
-			"par_historyStorageAccountContainer": {
-				"type": "string",
-				"value": "adfhistory"
-			},
-			"par_schemaFileStorageAccountDirectory": {
-				"type": "string",
-				"value": "flowjobschema"
-			},
-			"par_kürzel": {
-				"type": "string",
-				"value": "TODO"
-			}
-		}
-	},
-	"location": "westeurope"
+	"location": "westeurope",
+	"identity": {
+		"type": "SystemAssigned",
+		"principalId": "d8216b9e-c55c-40c0-870d-d3535cfbf192",
+		"tenantId": "5dc9cc33-bce8-4581-bc49-05e82d3943c2"
+	}
 }
