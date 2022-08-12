@@ -183,7 +183,7 @@
 		"parameters": {
 			"par_jobId": {
 				"type": "string",
-				"defaultValue": "Übung1"
+				"defaultValue": "task1"
 			},
 			"par_deleteFilesAfterCompletion": {
 				"type": "bool",
