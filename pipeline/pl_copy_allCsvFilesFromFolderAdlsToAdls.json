@@ -694,6 +694,10 @@
 							"dependsOn": [],
 							"userProperties": [],
 							"typeProperties": {
+								"pipeline": {
+									"referenceName": "pl_copy_oneCsvFileFromFolderAdlsToAdls",
+									"type": "PipelineReference"
+								},
 								"waitOnCompletion": true,
 								"parameters": {
 									"par_jobId": {
