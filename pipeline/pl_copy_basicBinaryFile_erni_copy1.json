@@ -108,11 +108,11 @@
 					"parameters": {
 						"par_logType": "Error",
 						"par_logId": {
-							"value": "@activity('EnterActivityNameHere').Error.errorCode",
+							"value": "@activity('copy_binaryFileAdlsToAdls').Error.errorCode",
 							"type": "Expression"
 						},
 						"par_logMessage": {
-							"value": "@activity('EnterActivityNameHere').Error.message",
+							"value": "@activity('copy_binaryFileAdlsToAdls').Error.message",
 							"type": "Expression"
 						},
 						"par_jobName": {
