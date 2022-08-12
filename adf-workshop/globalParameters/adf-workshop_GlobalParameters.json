@@ -1,0 +1,66 @@
+{
+	"par_environment": {
+		"type": "string",
+		"value": "devl"
+	},
+	"par_historyStorageAccountName": {
+		"type": "string",
+		"value": "workhophistory"
+	},
+	"par_historyStorageAccountContainer": {
+		"type": "string",
+		"value": "adfhistory"
+	},
+	"par_loggingStorageQueueName": {
+		"type": "string",
+		"value": "joberrors"
+	},
+	"par_jobmetadataStorageAccountContainer": {
+		"type": "string",
+		"value": "jobmetadata"
+	},
+	"par_dataflowConfigStorageAccountDirectory": {
+		"type": "string",
+		"value": "flowjobconfig"
+	},
+	"par_akvSasTokenUrlForWritingToQueue": {
+		"type": "string",
+		"value": "TODO"
+	},
+	"par_metadataStorageAccountName": {
+		"type": "string",
+		"value": "workshopmetadata"
+	},
+	"par_archiveStorageAccountName": {
+		"type": "string",
+		"value": "workshophistory"
+	},
+	"par_systemConfigStorageAccountDirectory": {
+		"type": "string",
+		"value": "systemconfig"
+	},
+	"par_adfLoggingStorageAccountName": {
+		"type": "string",
+		"value": "workshopmetadata"
+	},
+	"par_dataflowMappingStorageAccountDirectory": {
+		"type": "string",
+		"value": "flowjobmapping"
+	},
+	"par_schemaFileStorageAccountDirectory": {
+		"type": "string",
+		"value": "flowjobschema"
+	},
+	"par_failedContainerName": {
+		"type": "string",
+		"value": "failed"
+	},
+	"par_defaultMappingFileName": {
+		"type": "string",
+		"value": "mappingDefault.json"
+	},
+	"par_kürzel": {
+		"type": "string",
+		"value": "TODO"
+	}
+}

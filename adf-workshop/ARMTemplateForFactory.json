@@ -1,0 +1,5889 @@
+{
+	"$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+	"contentVersion": "1.0.0.0",
+	"parameters": {
+		"factoryName": {
+			"type": "string",
+			"metadata": "Data Factory name",
+			"defaultValue": "adf-workshop"
+		},
+		"ls_adls_metadata_accountKey": {
+			"type": "secureString",
+			"metadata": "Secure string for 'accountKey' of 'ls_adls_metadata'"
+		},
+		"ls_adls_properties_typeProperties_url": {
+			"type": "string",
+			"defaultValue": "@{concat('https://',linkedService().par_accountname,'.dfs.core.windows.net')}"
+		},
+		"ls_adls_metadata_properties_typeProperties_url": {
+			"type": "string",
+			"defaultValue": "https://workshopmetadatadevl.dfs.core.windows.net/"
+		},
+		"ls_akv_properties_typeProperties_baseUrl": {
+			"type": "string",
+			"defaultValue": "@{concat('https://',linkedService().par_azureKeyVaultName,'.vault.azure.net')}"
+		},
+		"ls_http_anonymous_properties_typeProperties_url": {
+			"type": "string",
+			"defaultValue": "@{linkedService().par_baseUrl}"
+		}
+	},
+	"variables": {
+		"factoryId": "[concat('Microsoft.DataFactory/factories/', parameters('factoryName'))]"
+	},
+	"resources": [
+		{
+			"name": "[concat(parameters('factoryName'), '/pl_copy_allCsvFilesFromFolderAdlsToAdls')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Testing a generic pipeline that uses the given jobID string to dynamically read data from a config table for a copy. activity moving all files from a certain ADLS storage to another one. Missing file mask feature",
+				"activities": [
+					{
+						"name": "lookup_obtainJsonConfigFile",
+						"description": "Looks up json config files to obtain job parameters.",
+						"type": "Lookup",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.01:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "JsonSource",
+								"storeSettings": {
+									"type": "AzureBlobFSReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "JsonReadSettings"
+								}
+							},
+							"dataset": {
+								"referenceName": "ds_adlsJsonFile",
+								"type": "DatasetReference",
+								"parameters": {
+									"par_storageAccount": {
+										"value": "@concat(pipeline().globalParameters.par_metadataStorageAccountName,pipeline().globalParameters.par_environment)",
+										"type": "Expression"
+									},
+									"par_container": {
+										"value": "@pipeline().globalParameters.par_jobmetadataStorageAccountContainer",
+										"type": "Expression"
+									},
+									"par_directory": {
+										"value": "@toLower(pipeline().globalParameters.par_dataflowConfigStorageAccountDirectory)",
+										"type": "Expression"
+									},
+									"par_fileName": {
+										"value": "@concat(pipeline().parameters.par_jobId,'.json')",
+										"type": "Expression"
+									},
+									"par_encoding": "Default(UTF-8)"
+								}
+							}
+						}
+					},
+					{
+						"name": "if_configFirstRowDoesNotExist_fail",
+						"description": "Checks if config file information has been obtained successfully and common variables are set if all is correct.",
+						"type": "IfCondition",
+						"dependsOn": [
+							{
+								"activity": "lookup_obtainJsonConfigFile",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"expression": {
+								"value": "@not(contains(activity('lookup_obtainJsonConfigFile').output,'firstRow'))",
+								"type": "Expression"
+							},
+							"ifFalseActivities": [
+								{
+									"name": "setVariable_targetAdlsConnectionArray",
+									"type": "SetVariable",
+									"dependsOn": [
+										{
+											"activity": "setVariable_sourceAdlsConnectionArray",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"variableName": "var_targetAdlsConnectionArray",
+										"value": {
+											"value": "@createArray(activity('lookup_obtainJsonConfigFile').output.firstRow.adlsTarget.storageAccount,activity('lookup_obtainJsonConfigFile').output.firstRow.adlsTarget.container,toLower(activity('lookup_obtainJsonConfigFile').output.firstRow.adlsTarget.directory))",
+											"type": "Expression"
+										}
+									}
+								},
+								{
+									"name": "fail_describeConfigError2",
+									"type": "Fail",
+									"dependsOn": [
+										{
+											"activity": "setVariable_targetAdlsConnectionArray",
+											"dependencyConditions": [
+												"Skipped",
+												"Failed"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"message": "Error setting variables with the provided information from JSON config.",
+										"errorCode": "ERROR_SETTING_VARIABLES_FROM_JOB_CONFIG_INFORMATION"
+									}
+								},
+								{
+									"name": "fail_plRunMustFail2",
+									"type": "Fail",
+									"dependsOn": [
+										{
+											"activity": "executePipeline_writeErrorLog4",
+											"dependencyConditions": [
+												"Completed"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"message": "plRunMustFail",
+										"errorCode": "plRunMustFail"
+									}
+								},
+								{
+									"name": "executePipeline_writeErrorLog4",
+									"description": "Pass error information to pl_writeLogToQueue and execute it.",
+									"type": "ExecutePipeline",
+									"dependsOn": [
+										{
+											"activity": "fail_describeConfigError2",
+											"dependencyConditions": [
+												"Failed"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "pl_writeLogToQueue",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": false,
+										"parameters": {
+											"par_logType": "Error",
+											"par_logId": {
+												"value": "@activity('fail_describeConfigError2').output.errorCode",
+												"type": "Expression"
+											},
+											"par_logMessage": {
+												"value": "@activity('fail_describeConfigError2').output.message",
+												"type": "Expression"
+											},
+											"par_jobName": {
+												"value": "@pipeline().Pipeline",
+												"type": "Expression"
+											},
+											"par_jobId": {
+												"value": "@pipeline().parameters.par_jobId",
+												"type": "Expression"
+											},
+											"par_jobRunId": {
+												"value": "@pipeline().RunId",
+												"type": "Expression"
+											},
+											"par_groupId": {
+												"value": "@pipeline().GroupId",
+												"type": "Expression"
+											},
+											"par_triggerId": {
+												"value": "@pipeline().TriggerId",
+												"type": "Expression"
+											},
+											"par_triggerName": {
+												"value": "@pipeline().TriggerName",
+												"type": "Expression"
+											},
+											"par_triggerTime": {
+												"value": "@pipeline().TriggerTime",
+												"type": "Expression"
+											},
+											"par_parentJobRunId": {
+												"value": "@pipeline()?.TriggeredByPipelineRunId",
+												"type": "Expression"
+											},
+											"par_impact": "3",
+											"par_urgency": "3",
+											"par_ticketTitle": "There is a problem with the JSON config file content.",
+											"par_ticketDescription": {
+												"value": "@concat('Setting of variables based upon JSON config file content is failing. Please resolve issue as soon as possible. Error message: ',activity('fail_describeConfigError2').Error.message)",
+												"type": "Expression"
+											},
+											"par_recipientLeanIxId": "null",
+											"par_businessSupportGroup": "null",
+											"par_technicalSupportGroup": "null"
+										}
+									}
+								},
+								{
+									"name": "setVariable_sourceAdlsConnectionArray",
+									"type": "SetVariable",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"variableName": "var_sourceAdlsConnectionArray",
+										"value": {
+											"value": "@createArray(activity('lookup_obtainJsonConfigFile').output.firstRow.adlsSource.storageAccount,activity('lookup_obtainJsonConfigFile').output.firstRow.adlsSource.container,toLower(activity('lookup_obtainJsonConfigFile').output.firstRow.adlsSource.directory))",
+											"type": "Expression"
+										}
+									}
+								}
+							],
+							"ifTrueActivities": [
+								{
+									"name": "fail_describeConfigError1",
+									"type": "Fail",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"message": "Error reading job detail table, please make sure your jobId is correct",
+										"errorCode": "ERROR_READING_CONFIG_JOB_DETAIL_TABLE"
+									}
+								},
+								{
+									"name": "executePipeline_writeErrorLog3",
+									"description": "Pass error information to pl_writeLogToQueue and execute it.",
+									"type": "ExecutePipeline",
+									"dependsOn": [
+										{
+											"activity": "fail_describeConfigError1",
+											"dependencyConditions": [
+												"Failed"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "pl_writeLogToQueue",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": false,
+										"parameters": {
+											"par_logType": "Error",
+											"par_logId": {
+												"value": "@activity('fail_describeConfigError1').Error.errorCode",
+												"type": "Expression"
+											},
+											"par_logMessage": {
+												"value": "@activity('fail_describeConfigError1').Error.message",
+												"type": "Expression"
+											},
+											"par_jobName": {
+												"value": "@pipeline().Pipeline",
+												"type": "Expression"
+											},
+											"par_jobId": {
+												"value": "@pipeline().parameters.par_jobId",
+												"type": "Expression"
+											},
+											"par_jobRunId": {
+												"value": "@pipeline().RunId",
+												"type": "Expression"
+											},
+											"par_groupId": {
+												"value": "@pipeline().GroupId",
+												"type": "Expression"
+											},
+											"par_triggerId": {
+												"value": "@pipeline().TriggerId",
+												"type": "Expression"
+											},
+											"par_triggerName": {
+												"value": "@pipeline().TriggerName",
+												"type": "Expression"
+											},
+											"par_triggerTime": {
+												"value": "@pipeline().TriggerTime",
+												"type": "Expression"
+											},
+											"par_parentJobRunId": {
+												"value": "@pipeline()?.TriggeredByPipelineRunId",
+												"type": "Expression"
+											},
+											"par_impact": "3",
+											"par_urgency": "3",
+											"par_ticketTitle": "Setting variables with JSON config file information is not working properly.",
+											"par_ticketDescription": {
+												"value": "@concat('Setting variables with JSON config file information is not working properly. Please resolve issue as soon as possible. Error message: ',activity('fail_describeConfigError1').Error.message)",
+												"type": "Expression"
+											},
+											"par_recipientLeanIxId": "null",
+											"par_businessSupportGroup": "null",
+											"par_technicalSupportGroup": "null"
+										}
+									}
+								},
+								{
+									"name": "fail_plRunMustFail1",
+									"type": "Fail",
+									"dependsOn": [
+										{
+											"activity": "executePipeline_writeErrorLog3",
+											"dependencyConditions": [
+												"Completed"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"message": "plRunMustFail",
+										"errorCode": "plRunMustFail"
+									}
+								}
+							]
+						}
+					},
+					{
+						"name": "getMetadata_getFileListFromDirectory",
+						"description": "Get the list of files, last modified filter included.",
+						"type": "GetMetadata",
+						"dependsOn": [
+							{
+								"activity": "setVariable_latestModifiedTime",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.01:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"dataset": {
+								"referenceName": "ds_adlsBinaryFolder",
+								"type": "DatasetReference",
+								"parameters": {
+									"par_storageAccount": {
+										"value": "@concat(variables('var_sourceAdlsConnectionArray')[0],pipeline().globalParameters.par_environment)",
+										"type": "Expression"
+									},
+									"par_container": {
+										"value": "@variables('var_sourceAdlsConnectionArray')[1]",
+										"type": "Expression"
+									},
+									"par_directory": {
+										"value": "@variables('var_sourceAdlsConnectionArray')[2]",
+										"type": "Expression"
+									}
+								}
+							},
+							"fieldList": [
+								"childItems",
+								"lastModified"
+							],
+							"storeSettings": {
+								"type": "AzureBlobFSReadSettings",
+								"recursive": true,
+								"modifiedDatetimeEnd": {
+									"value": "@variables('var_latestModifiedTime')",
+									"type": "Expression"
+								}
+							},
+							"formatSettings": {
+								"type": "BinaryReadSettings"
+							}
+						}
+					},
+					{
+						"name": "filter_uponFileExtension",
+						"description": "Only files will be selected which have the correct file extension.",
+						"type": "Filter",
+						"dependsOn": [
+							{
+								"activity": "getMetadata_getFileListFromDirectory",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"items": {
+								"value": "@activity('getMetadata_getFileListFromDirectory').output.childItems",
+								"type": "Expression"
+							},
+							"condition": {
+								"value": "@and(equals(item().type,'File'),endswith(item().name,activity('lookup_obtainJsonConfigFile').output.firstRow.fileType))",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "setVariable_latestModifiedTime",
+						"description": "Sets the variable latest modified time with maxTimeUnchanged parameter.",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "if_configFirstRowDoesNotExist_fail",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "var_latestModifiedTime",
+							"value": {
+								"value": "@getPastTime(activity('lookup_obtainJsonConfigFile').output.firstRow.maxTimeUnchanged,'Second')",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "filter_uponFileMask",
+						"description": "Only files will be selected which names contain the file mask string (case sensitive).",
+						"type": "Filter",
+						"dependsOn": [
+							{
+								"activity": "filter_uponFileExtension",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"items": {
+								"value": "@activity('filter_uponFileExtension').output.value",
+								"type": "Expression"
+							},
+							"condition": {
+								"value": "@or(equals(activity('lookup_obtainJsonConfigFile').output.firstRow.fileMask,''), if(startsWith(activity('lookup_obtainJsonConfigFile').output.firstRow.fileMask,'*'), if(endsWith(activity('lookup_obtainJsonConfigFile').output.firstRow.fileMask,'*'),contains(split(item().name,'.')[0], replace(activity('lookup_obtainJsonConfigFile').output.firstRow.fileMask,'*','')),endsWith(split(item().name,'.')[0],replace(activity('lookup_obtainJsonConfigFile').output.firstRow.fileMask,'*',''))),if(endsWith(activity('lookup_obtainJsonConfigFile').output.firstRow.fileMask,'*'),startsWith(split(item().name,'.')[0],replace(activity('lookup_obtainJsonConfigFile').output.firstRow.fileMask,'*','')),equals(split(item().name,'.')[0],activity('lookup_obtainJsonConfigFile').output.firstRow.fileMask))))",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "executePipeline_writeErrorLog1",
+						"description": "Pass error information to pl_writeLogToQueue and execute it.",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "lookup_obtainJsonConfigFile",
+								"dependencyConditions": [
+									"Failed"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "pl_writeLogToQueue",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": false,
+							"parameters": {
+								"par_logType": "Error",
+								"par_logId": {
+									"value": "@activity('lookup_obtainJsonConfigFile').Error.errorCode",
+									"type": "Expression"
+								},
+								"par_logMessage": {
+									"value": "@activity('lookup_obtainJsonConfigFile').Error.message",
+									"type": "Expression"
+								},
+								"par_jobName": {
+									"value": "@pipeline().Pipeline",
+									"type": "Expression"
+								},
+								"par_jobId": {
+									"value": "@pipeline().parameters.par_jobId",
+									"type": "Expression"
+								},
+								"par_jobRunId": {
+									"value": "@pipeline().RunId",
+									"type": "Expression"
+								},
+								"par_groupId": {
+									"value": "@pipeline().GroupId",
+									"type": "Expression"
+								},
+								"par_triggerId": {
+									"value": "@pipeline().TriggerId",
+									"type": "Expression"
+								},
+								"par_triggerName": {
+									"value": "@pipeline().TriggerName",
+									"type": "Expression"
+								},
+								"par_triggerTime": {
+									"value": "@pipeline().TriggerTime",
+									"type": "Expression"
+								},
+								"par_parentJobRunId": {
+									"value": "@pipeline()?.TriggeredByPipelineRunId",
+									"type": "Expression"
+								},
+								"par_impact": "3",
+								"par_urgency": "3",
+								"par_ticketTitle": "Reading JSON config file is not working.",
+								"par_ticketDescription": {
+									"value": "@concat('Reading of JSON config file from metadata storage account is not working. Please resolve issue as soon as possible. Error message: ',activity('lookup_obtainJsonConfigFile').Error.message)",
+									"type": "Expression"
+								},
+								"par_recipientLeanIxId": "null",
+								"par_businessSupportGroup": "null",
+								"par_technicalSupportGroup": "null"
+							}
+						}
+					},
+					{
+						"name": "executePipeline_writeErrorLog5",
+						"description": "Pass error information to pl_writeLogToQueue and execute it.",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "getMetadata_getFileListFromDirectory",
+								"dependencyConditions": [
+									"Failed"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "pl_writeLogToQueue",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": false,
+							"parameters": {
+								"par_logType": "Error",
+								"par_logId": {
+									"value": "@activity('getMetadata_getFileListFromDirectory').Error.errorCode",
+									"type": "Expression"
+								},
+								"par_logMessage": {
+									"value": "@activity('getMetadata_getFileListFromDirectory').Error.message",
+									"type": "Expression"
+								},
+								"par_jobName": {
+									"value": "@pipeline().Pipeline",
+									"type": "Expression"
+								},
+								"par_jobId": {
+									"value": "@pipeline().parameters.par_jobId",
+									"type": "Expression"
+								},
+								"par_jobRunId": {
+									"value": "@pipeline().RunId",
+									"type": "Expression"
+								},
+								"par_groupId": {
+									"value": "@pipeline().GroupId",
+									"type": "Expression"
+								},
+								"par_triggerId": {
+									"value": "@pipeline().TriggerId",
+									"type": "Expression"
+								},
+								"par_triggerName": {
+									"value": "@pipeline().TriggerName",
+									"type": "Expression"
+								},
+								"par_triggerTime": {
+									"value": "@pipeline().TriggerTime",
+									"type": "Expression"
+								},
+								"par_parentJobRunId": {
+									"value": "@pipeline()?.TriggeredByPipelineRunId",
+									"type": "Expression"
+								},
+								"par_impact": "3",
+								"par_urgency": "3",
+								"par_ticketTitle": "Getting the metadata from the source via SFTP is not working.",
+								"par_ticketDescription": {
+									"value": "@concat('Getting the metadata from the source via SFTP is not working. Please resolve issue as soon as possible. Error message: ',activity('getMetadata_getFileListFromDirectory').Error.message)",
+									"type": "Expression"
+								},
+								"par_recipientLeanIxId": "null",
+								"par_businessSupportGroup": "null",
+								"par_technicalSupportGroup": "null"
+							}
+						}
+					},
+					{
+						"name": "if_createWarningIfNoDataIsTransferredFlagActive",
+						"type": "IfCondition",
+						"dependsOn": [
+							{
+								"activity": "filter_uponFileMask",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"expression": {
+								"value": "@and(activity('lookup_obtainJsonConfigFile').output.firstRow.createWarningIfNoDataIsTransferredFlag, equals(activity('filter_uponFileMask').output.FilteredItemsCount,0))",
+								"type": "Expression"
+							},
+							"ifTrueActivities": [
+								{
+									"name": "executePipeline_writeWarningLog",
+									"description": "Pass success information to pl_writeLogToQueue and execute it.",
+									"type": "ExecutePipeline",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "pl_writeLogToQueue",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": false,
+										"parameters": {
+											"par_logType": "Warning",
+											"par_logId": "TO BE DEFINED WARNING_ID",
+											"par_logMessage": {
+												"value": "'Warning: No data has been transfered as the filtered list of source files is empty.'",
+												"type": "Expression"
+											},
+											"par_jobName": {
+												"value": "@pipeline().Pipeline",
+												"type": "Expression"
+											},
+											"par_jobId": {
+												"value": "@pipeline().parameters.par_jobId",
+												"type": "Expression"
+											},
+											"par_jobRunId": {
+												"value": "@pipeline().RunId",
+												"type": "Expression"
+											},
+											"par_groupId": {
+												"value": "@pipeline().GroupId",
+												"type": "Expression"
+											},
+											"par_triggerId": {
+												"value": "@pipeline().TriggerId",
+												"type": "Expression"
+											},
+											"par_triggerName": {
+												"value": "@pipeline().TriggerName",
+												"type": "Expression"
+											},
+											"par_triggerTime": {
+												"value": "@pipeline().TriggerTime",
+												"type": "Expression"
+											},
+											"par_parentJobRunId": {
+												"value": "@pipeline()?.TriggeredByPipelineRunId",
+												"type": "Expression"
+											}
+										}
+									}
+								}
+							]
+						}
+					},
+					{
+						"name": "forEach_fileInList",
+						"description": "Iterate over each file, and copy them one by one.",
+						"type": "ForEach",
+						"dependsOn": [
+							{
+								"activity": "filter_uponFileMask",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"items": {
+								"value": "@activity('filter_uponFileMask').output.value",
+								"type": "Expression"
+							},
+							"isSequential": true,
+							"activities": [
+								{
+									"name": "executePipeline_copyOneCsvFileFromFolderAdlsToAdls",
+									"type": "ExecutePipeline",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "pl_copy_oneCsvFileFromFolderAdlsToAdls",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": true,
+										"parameters": {
+											"par_jobId": {
+												"value": "@pipeline().parameters.par_jobId",
+												"type": "Expression"
+											},
+											"par_sourceFileName": {
+												"value": "@item().name",
+												"type": "Expression"
+											}
+										}
+									}
+								}
+							]
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {},
+					"cancelAfter": {}
+				},
+				"parameters": {
+					"par_jobId": {
+						"type": "string",
+						"defaultValue": "http-1_PRC"
+					}
+				},
+				"variables": {
+					"var_latestModifiedTime": {
+						"type": "String"
+					},
+					"var_nowTime": {
+						"type": "String"
+					},
+					"var_targetFilename": {
+						"type": "String"
+					},
+					"var_sourceAdlsConnectionArray": {
+						"type": "Array"
+					},
+					"var_targetAdlsConnectionArray": {
+						"type": "Array"
+					}
+				},
+				"folder": {
+					"name": "AMIS/2_Processing/CSV copy"
+				},
+				"annotations": [],
+				"lastPublishTime": "2022-04-13T10:07:16Z"
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/ds_adlsJsonFile')]",
+				"[concat(variables('factoryId'), '/datasets/ds_adlsBinaryFolder')]",
+				"[concat(variables('factoryId'), '/pipelines/pl_writeLogToQueue')]",
+				"[concat(variables('factoryId'), '/pipelines/pl_copy_oneCsvFileFromFolderAdlsToAdls')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/pl_copy_basicBinaryFileAdls')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "copy_binaryFileAdlsToAdls",
+						"description": "Copy a file from the source store to the destination store.",
+						"type": "Copy",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.01:00:00",
+							"retry": 1,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "BinarySource",
+								"storeSettings": {
+									"type": "AzureBlobFSReadSettings",
+									"recursive": false,
+									"deleteFilesAfterCompletion": {
+										"value": "@pipeline().parameters.par_deleteFilesAfterCompletion",
+										"type": "Expression"
+									}
+								},
+								"formatSettings": {
+									"type": "BinaryReadSettings"
+								},
+								"recursive": false
+							},
+							"sink": {
+								"type": "BinarySink",
+								"storeSettings": {
+									"type": "AzureBlobFSWriteSettings"
+								}
+							},
+							"enableStaging": false,
+							"dataIntegrationUnits": 2
+						},
+						"inputs": [
+							{
+								"referenceName": "ds_adlsBinaryFile",
+								"type": "DatasetReference",
+								"parameters": {
+									"par_storageAccount": {
+										"value": "@pipeline().parameters.par_sourceStorageAccount",
+										"type": "Expression"
+									},
+									"par_container": {
+										"value": "@pipeline().parameters.par_sourceContainer",
+										"type": "Expression"
+									},
+									"par_directory": {
+										"value": "@pipeline().parameters.par_sourceDirectory",
+										"type": "Expression"
+									},
+									"par_filename": {
+										"value": "@pipeline().parameters.par_sourceFileName",
+										"type": "Expression"
+									}
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "ds_adlsBinaryFile",
+								"type": "DatasetReference",
+								"parameters": {
+									"par_storageAccount": {
+										"value": "@pipeline().parameters.par_targetStorageAccount",
+										"type": "Expression"
+									},
+									"par_container": {
+										"value": "@pipeline().parameters.par_targetContainer",
+										"type": "Expression"
+									},
+									"par_directory": {
+										"value": "@pipeline().parameters.par_targetDirectory",
+										"type": "Expression"
+									},
+									"par_filename": {
+										"value": "@pipeline().parameters.par_targetFileName",
+										"type": "Expression"
+									}
+								}
+							}
+						]
+					},
+					{
+						"name": "executePipeline_writeErrorLog",
+						"description": "Pass error information to pl_writeLogToQueue and execute it.",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "copy_binaryFileAdlsToAdls",
+								"dependencyConditions": [
+									"Failed"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "pl_writeLogToQueue",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": false,
+							"parameters": {
+								"par_logType": "Error",
+								"par_logId": {
+									"value": "@activity('copy_binaryFileAdlsToAdls').Error.errorCode",
+									"type": "Expression"
+								},
+								"par_logMessage": {
+									"value": "@activity('copy_binaryFileAdlsToAdls').Error.message",
+									"type": "Expression"
+								},
+								"par_jobName": {
+									"value": "@pipeline().Pipeline",
+									"type": "Expression"
+								},
+								"par_jobId": {
+									"value": "@pipeline().parameters.par_jobId",
+									"type": "Expression"
+								},
+								"par_jobRunId": {
+									"value": "@pipeline().RunId",
+									"type": "Expression"
+								},
+								"par_parentJobRunId": {
+									"value": "@pipeline()?.TriggeredByPipelineRunId",
+									"type": "Expression"
+								}
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {},
+					"cancelAfter": {}
+				},
+				"parameters": {
+					"par_jobId": {
+						"type": "string"
+					},
+					"par_sourceStorageAccount": {
+						"type": "string"
+					},
+					"par_sourceContainer": {
+						"type": "string"
+					},
+					"par_sourceDirectory": {
+						"type": "string"
+					},
+					"par_sourceFilename": {
+						"type": "string"
+					},
+					"par_targetStorageAccount": {
+						"type": "string"
+					},
+					"par_targetContainer": {
+						"type": "string"
+					},
+					"par_targetDirectory": {
+						"type": "string"
+					},
+					"par_targetFileName": {
+						"type": "string"
+					},
+					"par_deleteFilesAfterCompletion": {
+						"type": "bool"
+					}
+				},
+				"folder": {
+					"name": "AMIS/4_Shared/Archiving"
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/ds_adlsBinaryFile')]",
+				"[concat(variables('factoryId'), '/pipelines/pl_writeLogToQueue')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/pl_copy_extractBinaryFileFromHttpAnonymousToAdls')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "lookup_obtainJsonConfigFile",
+						"description": "Looks up json config files to obtain job parameters.",
+						"type": "Lookup",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.01:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "JsonSource",
+								"storeSettings": {
+									"type": "AzureBlobFSReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "JsonReadSettings"
+								}
+							},
+							"dataset": {
+								"referenceName": "ds_adlsJsonFile",
+								"type": "DatasetReference",
+								"parameters": {
+									"par_storageAccount": {
+										"value": "@concat(pipeline().globalParameters.par_metadataStorageAccountName,pipeline().globalParameters.par_environment)",
+										"type": "Expression"
+									},
+									"par_container": {
+										"value": "@pipeline().globalParameters.par_jobmetadataStorageAccountContainer",
+										"type": "Expression"
+									},
+									"par_directory": {
+										"value": "@toLower(pipeline().globalParameters.par_dataflowConfigStorageAccountDirectory)",
+										"type": "Expression"
+									},
+									"par_fileName": {
+										"value": "@concat(pipeline().parameters.par_jobId,'.json')",
+										"type": "Expression"
+									},
+									"par_encoding": "Default(UTF-8)"
+								}
+							}
+						}
+					},
+					{
+						"name": "if_configFirstRowDoesNotExist_fail",
+						"description": "Checks if config file information has been obtained successfully and common variables are set if all is correct.",
+						"type": "IfCondition",
+						"dependsOn": [
+							{
+								"activity": "lookup_obtainSourceSystemConfigFile",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"expression": {
+								"value": "@not(contains(activity('lookup_obtainJsonConfigFile').output,'firstRow'))",
+								"type": "Expression"
+							},
+							"ifFalseActivities": [
+								{
+									"name": "setVariable_targetStorageAccount",
+									"type": "SetVariable",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"variableName": "var_targetStorageAccount",
+										"value": {
+											"value": "@activity('lookup_obtainJsonConfigFile').output.firstRow.adlsTarget.storageAccount",
+											"type": "Expression"
+										}
+									}
+								},
+								{
+									"name": "setVariable_targetContainer",
+									"type": "SetVariable",
+									"dependsOn": [
+										{
+											"activity": "setVariable_targetStorageAccount",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"variableName": "var_targetContainer",
+										"value": {
+											"value": "@activity('lookup_obtainJsonConfigFile').output.firstRow.adlsTarget.container",
+											"type": "Expression"
+										}
+									}
+								},
+								{
+									"name": "setVariable_targetDirectory",
+									"type": "SetVariable",
+									"dependsOn": [
+										{
+											"activity": "setVariable_targetContainer",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"variableName": "var_targetDirectory",
+										"value": {
+											"value": "@toLower(activity('lookup_obtainJsonConfigFile').output.firstRow.adlsTarget.directory)",
+											"type": "Expression"
+										}
+									}
+								},
+								{
+									"name": "setVariable_targetFilename",
+									"description": "Sets the target filename by taking the source filename and, if the according addTimestampFlag is active, by adding a timestamp to the name.",
+									"type": "SetVariable",
+									"dependsOn": [
+										{
+											"activity": "setVariable_targetDirectory",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										},
+										{
+											"activity": "setVariable_relativeUrl",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										},
+										{
+											"activity": "setVariable_requestBody",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"variableName": "var_targetFilename",
+										"value": {
+											"value": "@concat(activity('lookup_obtainJsonConfigFile').output.firstRow.targetFilePrefix,if(activity('lookup_obtainJsonConfigFile').output.firstRow.addTimestampFlag, formatDateTime(utcnow(),activity('lookup_obtainJsonConfigFile').output.firstRow.setTimestampformat),''),activity('lookup_obtainJsonConfigFile').output.firstRow.targetFileExtension)",
+											"type": "Expression"
+										}
+									}
+								},
+								{
+									"name": "setVariable_baseUrl",
+									"type": "SetVariable",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"variableName": "var_baseUrl",
+										"value": {
+											"value": "@activity('lookup_obtainSourceSystemConfigFile').output.firstRow.baseUrl",
+											"type": "Expression"
+										}
+									}
+								},
+								{
+									"name": "setVariable_relativeUrl",
+									"type": "SetVariable",
+									"dependsOn": [
+										{
+											"activity": "setVariable_baseUrl",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"variableName": "var_relativeUrl",
+										"value": {
+											"value": "@activity('lookup_obtainJsonConfigFile').output.firstRow.httpSource.relativeUrl",
+											"type": "Expression"
+										}
+									}
+								},
+								{
+									"name": "fail_describeConfigError2",
+									"type": "Fail",
+									"dependsOn": [
+										{
+											"activity": "setVariable_targetFilename",
+											"dependencyConditions": [
+												"Skipped",
+												"Failed"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"message": "Error setting variables with the provided information from JSON config.",
+										"errorCode": "ERROR_SETTING_VARIABLES_FROM_JOB_CONFIG_INFORMATION"
+									}
+								},
+								{
+									"name": "fail_plRunMustFail2",
+									"type": "Fail",
+									"dependsOn": [
+										{
+											"activity": "executePipeline_writeErrorLog4",
+											"dependencyConditions": [
+												"Completed"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"message": "plRunMustFail",
+										"errorCode": "plRunMustFail"
+									}
+								},
+								{
+									"name": "executePipeline_writeErrorLog4",
+									"description": "Pass error information to pl_writeLogToQueue and execute it.",
+									"type": "ExecutePipeline",
+									"dependsOn": [
+										{
+											"activity": "fail_describeConfigError2",
+											"dependencyConditions": [
+												"Failed"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "pl_writeLogToQueue",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": false,
+										"parameters": {
+											"par_logType": "Error",
+											"par_logId": {
+												"value": "@activity('fail_describeConfigError2').output.errorCode",
+												"type": "Expression"
+											},
+											"par_logMessage": {
+												"value": "@activity('fail_describeConfigError2').output.message",
+												"type": "Expression"
+											},
+											"par_jobName": {
+												"value": "@pipeline().Pipeline",
+												"type": "Expression"
+											},
+											"par_jobId": {
+												"value": "@pipeline().parameters.par_jobId",
+												"type": "Expression"
+											},
+											"par_jobRunId": {
+												"value": "@pipeline().RunId",
+												"type": "Expression"
+											},
+											"par_parentJobRunId": {
+												"value": "@pipeline()?.TriggeredByPipelineRunId",
+												"type": "Expression"
+											}
+										}
+									}
+								},
+								{
+									"name": "setVariable_requestBody",
+									"type": "SetVariable",
+									"dependsOn": [
+										{
+											"activity": "setVariable_additionalHeaders",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"variableName": "var_requestBody",
+										"value": {
+											"value": "@activity('lookup_obtainJsonConfigFile').output.firstRow.httpSource.requestBody",
+											"type": "Expression"
+										}
+									}
+								},
+								{
+									"name": "setVariable_additionalHeaders",
+									"type": "SetVariable",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"variableName": "var_additionalHeaders",
+										"value": {
+											"value": "@activity('lookup_obtainJsonConfigFile').output.firstRow.httpSource.additionalHeaders",
+											"type": "Expression"
+										}
+									}
+								}
+							],
+							"ifTrueActivities": [
+								{
+									"name": "fail_describeConfigError1",
+									"type": "Fail",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"message": "Error reading job detail table, please make sure your jobId is correct",
+										"errorCode": "ERROR_READING_CONFIG_JOB_DETAIL_TABLE"
+									}
+								},
+								{
+									"name": "fail_plRunMustFail1",
+									"type": "Fail",
+									"dependsOn": [
+										{
+											"activity": "executePipeline_writeErrorLog3",
+											"dependencyConditions": [
+												"Completed"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"message": "plRunMustFail",
+										"errorCode": "plRunMustFail"
+									}
+								},
+								{
+									"name": "executePipeline_writeErrorLog3",
+									"description": "Pass error information to pl_writeLogToQueue and execute it.",
+									"type": "ExecutePipeline",
+									"dependsOn": [
+										{
+											"activity": "fail_describeConfigError1",
+											"dependencyConditions": [
+												"Failed"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "pl_writeLogToQueue",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": false,
+										"parameters": {
+											"par_logType": "Error",
+											"par_logId": {
+												"value": "@activity('fail_describeConfigError1').output.errorCode",
+												"type": "Expression"
+											},
+											"par_logMessage": {
+												"value": "@activity('fail_describeConfigError1').output.message",
+												"type": "Expression"
+											},
+											"par_jobName": {
+												"value": "@pipeline().Pipeline",
+												"type": "Expression"
+											},
+											"par_jobId": {
+												"value": "@pipeline().parameters.par_jobId",
+												"type": "Expression"
+											},
+											"par_jobRunId": {
+												"value": "@pipeline().RunId",
+												"type": "Expression"
+											},
+											"par_parentJobRunId": {
+												"value": "@pipeline()?.TriggeredByPipelineRunId",
+												"type": "Expression"
+											}
+										}
+									}
+								}
+							]
+						}
+					},
+					{
+						"name": "copy_httpGetBinaryToAdls",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "if_configFirstRowDoesNotExist_fail",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.01:00:00",
+							"retry": 3,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "BinarySource",
+								"storeSettings": {
+									"type": "HttpReadSettings",
+									"maxConcurrentConnections": {
+										"value": "@activity('lookup_obtainJsonConfigFile').output.firstRow.httpSource.maxConcurrentConnections",
+										"type": "Expression"
+									},
+									"requestMethod": {
+										"value": "@{if(contains(activity('lookup_obtainJsonConfigFile').output.firstRow.httpSource,'requestMethod'),activity('lookup_obtainJsonConfigFile').output.firstRow.httpSource.requestMethod,'GET')}",
+										"type": "Expression"
+									},
+									"additionalHeaders": {
+										"value": "@{variables('var_additionalHeaders')}",
+										"type": "Expression"
+									},
+									"requestBody": {
+										"value": "@{variables('var_requestBody')}",
+										"type": "Expression"
+									},
+									"requestTimeout": {
+										"value": "@{activity('lookup_obtainJsonConfigFile').output.firstRow.httpSource.requestTimeout}",
+										"type": "Expression"
+									}
+								},
+								"formatSettings": {
+									"type": "BinaryReadSettings"
+								}
+							},
+							"sink": {
+								"type": "BinarySink",
+								"storeSettings": {
+									"type": "AzureBlobFSWriteSettings"
+								}
+							},
+							"enableStaging": false,
+							"parallelCopies": {
+								"value": "@activity('lookup_obtainJsonConfigFile').output.firstRow.processing.degreeOfParallelism",
+								"type": "Expression"
+							},
+							"dataIntegrationUnits": {
+								"value": "@activity('lookup_obtainJsonConfigFile').output.firstRow.processing.dataIntegrationUnit",
+								"type": "Expression"
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "ds_httpBinaryFile_anonymous_noCompression",
+								"type": "DatasetReference",
+								"parameters": {
+									"par_baseUrl": {
+										"value": "@variables('var_baseUrl')",
+										"type": "Expression"
+									},
+									"par_relativeUrl": {
+										"value": "@variables('var_relativeUrl')",
+										"type": "Expression"
+									}
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "ds_adlsBinaryFile",
+								"type": "DatasetReference",
+								"parameters": {
+									"par_storageAccount": {
+										"value": "@concat(variables('var_targetStorageAccount'),pipeline().globalParameters.par_environment)",
+										"type": "Expression"
+									},
+									"par_container": {
+										"value": "@variables('var_targetContainer')",
+										"type": "Expression"
+									},
+									"par_directory": {
+										"value": "@variables('var_targetDirectory')",
+										"type": "Expression"
+									},
+									"par_filename": {
+										"value": "@variables('var_targetFilename')",
+										"type": "Expression"
+									}
+								}
+							}
+						]
+					},
+					{
+						"name": "if_archiveTargetFlagActive",
+						"description": "Checks if the targetfile needs to be archived and does so if necessary.",
+						"type": "IfCondition",
+						"dependsOn": [
+							{
+								"activity": "copy_httpGetBinaryToAdls",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"expression": {
+								"value": "@activity('lookup_obtainJsonConfigFile').output.firstRow.archiveTargetFlag",
+								"type": "Expression"
+							},
+							"ifTrueActivities": [
+								{
+									"name": "executePipeline_archiveTargetFile",
+									"type": "ExecutePipeline",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "pl_copy_basicBinaryFileAdls",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": false,
+										"parameters": {
+											"par_jobId": {
+												"value": "@pipeline().parameters.par_jobId",
+												"type": "Expression"
+											},
+											"par_sourceStorageAccount": {
+												"value": "@concat(variables('var_targetStorageAccount'),pipeline().globalParameters.par_environment)",
+												"type": "Expression"
+											},
+											"par_sourceContainer": {
+												"value": "@variables('var_targetContainer')",
+												"type": "Expression"
+											},
+											"par_sourceDirectory": {
+												"value": "@variables('var_targetDirectory')",
+												"type": "Expression"
+											},
+											"par_sourceFilename": {
+												"value": "@variables('var_targetFilename')",
+												"type": "Expression"
+											},
+											"par_targetStorageAccount": {
+												"value": "@concat(pipeline().globalParameters.par_historyStorageAccountName,pipeline().globalParameters.par_environment)",
+												"type": "Expression"
+											},
+											"par_targetContainer": {
+												"value": "@pipeline().globalParameters.par_historyStorageAccountContainer",
+												"type": "Expression"
+											},
+											"par_targetDirectory": {
+												"value": "@toLower(concat('data','/', activity('lookup_obtainJsonConfigFile').output.firstRow.sourceApplicationCode, '/', activity('lookup_obtainJsonConfigFile').output.firstRow.interfaceId, '/', activity('lookup_obtainJsonConfigFile').output.firstRow.processingPhaseCode, '/', 'target'))",
+												"type": "Expression"
+											},
+											"par_targetFileName": {
+												"value": "@variables('var_targetFilename')",
+												"type": "Expression"
+											},
+											"par_deleteFilesAfterCompletion": false,
+											"par_impact": "2",
+											"par_urgency": "2",
+											"par_ticketTitle": "Archiving target file to history failed.",
+											"par_ticketDescription": "Archiving the successfuly copied target file to the history container failed.",
+											"par_recipientLeanIxId": "null",
+											"par_businessSupportGroup": {
+												"value": "@activity('lookup_obtainJsonConfigFile').output.firstRow.businessNotification",
+												"type": "Expression"
+											},
+											"par_technicalSupportGroup": {
+												"value": "@activity('lookup_obtainJsonConfigFile').output.firstRow.technicalNotification",
+												"type": "Expression"
+											}
+										}
+									}
+								}
+							]
+						}
+					},
+					{
+						"name": "executePipeline_writeErrorLog1",
+						"description": "Pass error information to pl_writeLogToQueue and execute it.",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "lookup_obtainJsonConfigFile",
+								"dependencyConditions": [
+									"Failed"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "pl_writeLogToQueue",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": false,
+							"parameters": {
+								"par_logType": "Error",
+								"par_logId": {
+									"value": "@activity('lookup_obtainJsonConfigFile').Error.errorCode",
+									"type": "Expression"
+								},
+								"par_logMessage": {
+									"value": "@activity('lookup_obtainJsonConfigFile').Error.message",
+									"type": "Expression"
+								},
+								"par_jobName": {
+									"value": "@pipeline().Pipeline",
+									"type": "Expression"
+								},
+								"par_jobId": {
+									"value": "@pipeline().parameters.par_jobId",
+									"type": "Expression"
+								},
+								"par_jobRunId": {
+									"value": "@pipeline().RunId",
+									"type": "Expression"
+								},
+								"par_parentJobRunId": {
+									"value": "@pipeline()?.TriggeredByPipelineRunId",
+									"type": "Expression"
+								},
+								"par_kürzel": {
+									"value": "@pipeline().globalParameters.par_kürzel",
+									"type": "Expression"
+								}
+							}
+						}
+					},
+					{
+						"name": "executePipeline_writeErrorLog5",
+						"description": "Pass error information to pl_writeLogToQueue and execute it.",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "copy_httpGetBinaryToAdls",
+								"dependencyConditions": [
+									"Failed"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "pl_writeLogToQueue",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": false,
+							"parameters": {
+								"par_logType": "Error",
+								"par_logId": {
+									"value": "@activity('copy_httpGetBinaryToAdls').Error.errorCode",
+									"type": "Expression"
+								},
+								"par_logMessage": {
+									"value": "@activity('copy_httpGetBinaryToAdls').Error.message",
+									"type": "Expression"
+								},
+								"par_jobName": {
+									"value": "@pipeline().Pipeline",
+									"type": "Expression"
+								},
+								"par_jobId": {
+									"value": "@pipeline().parameters.par_jobId",
+									"type": "Expression"
+								},
+								"par_jobRunId": {
+									"value": "@pipeline().RunId",
+									"type": "Expression"
+								},
+								"par_parentJobRunId": {
+									"value": "@pipeline()?.TriggeredByPipelineRunId",
+									"type": "Expression"
+								}
+							}
+						}
+					},
+					{
+						"name": "executePipeline_writeSuccessLog",
+						"description": "Pass success information to pl_writeLogToQueue and execute it.",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "copy_httpGetBinaryToAdls",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "pl_writeLogToQueue",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": false,
+							"parameters": {
+								"par_logType": "Success",
+								"par_logId": "TO BE DEFINED SUCCESS_ID",
+								"par_logMessage": {
+									"value": "@concat('The file ',variables('var_targetFilename'),' was successfully extracted from ', variables('var_baseUrl'),'\\/',variables('var_relativeUrl'), ' and saved on ', variables('var_targetStorageAccount'), '.')",
+									"type": "Expression"
+								},
+								"par_jobName": {
+									"value": "@pipeline().Pipeline",
+									"type": "Expression"
+								},
+								"par_jobId": {
+									"value": "@pipeline().parameters.par_jobId",
+									"type": "Expression"
+								},
+								"par_jobRunId": {
+									"value": "@pipeline().RunId",
+									"type": "Expression"
+								},
+								"par_parentJobRunId": {
+									"value": "@pipeline()?.TriggeredByPipelineRunId",
+									"type": "Expression"
+								}
+							}
+						}
+					},
+					{
+						"name": "lookup_obtainSourceSystemConfigFile",
+						"type": "Lookup",
+						"dependsOn": [
+							{
+								"activity": "lookup_obtainJsonConfigFile",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.01:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "JsonSource",
+								"storeSettings": {
+									"type": "AzureBlobFSReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "JsonReadSettings"
+								}
+							},
+							"dataset": {
+								"referenceName": "ds_adlsJsonFile",
+								"type": "DatasetReference",
+								"parameters": {
+									"par_storageAccount": {
+										"value": "@concat(pipeline().globalParameters.par_metadataStorageAccountName,pipeline().globalParameters.par_environment)",
+										"type": "Expression"
+									},
+									"par_container": {
+										"value": "@pipeline().globalParameters.par_jobmetadataStorageAccountContainer",
+										"type": "Expression"
+									},
+									"par_directory": {
+										"value": "@toLower(pipeline().globalParameters.par_systemConfigStorageAccountDirectory)",
+										"type": "Expression"
+									},
+									"par_fileName": {
+										"value": "@concat(activity('lookup_obtainJsonConfigFile').output.firstrow.sourceSystemCode,'_',activity('lookup_obtainJsonConfigFile').output.firstrow.sourceProtocolCode,'_',toUpper(pipeline().globalParameters.par_environment),'.json')",
+										"type": "Expression"
+									},
+									"par_encoding": "Default(UTF-8)"
+								}
+							}
+						}
+					},
+					{
+						"name": "executePipeline_writeErrorLog2",
+						"description": "Pass error information to pl_writeLogToQueue and execute it.",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "lookup_obtainSourceSystemConfigFile",
+								"dependencyConditions": [
+									"Failed"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "pl_writeLogToQueue",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": false,
+							"parameters": {
+								"par_logType": "Error",
+								"par_logId": {
+									"value": "@activity('lookup_obtainSourceSystemConfigFile').Error.errorCode",
+									"type": "Expression"
+								},
+								"par_logMessage": {
+									"value": "@activity('lookup_obtainSourceSystemConfigFile').Error.message",
+									"type": "Expression"
+								},
+								"par_jobName": {
+									"value": "@pipeline().Pipeline",
+									"type": "Expression"
+								},
+								"par_jobId": {
+									"value": "@pipeline().parameters.par_jobId",
+									"type": "Expression"
+								},
+								"par_jobRunId": {
+									"value": "@pipeline().RunId",
+									"type": "Expression"
+								},
+								"par_parentJobRunId": {
+									"value": "@pipeline()?.TriggeredByPipelineRunId",
+									"type": "Expression"
+								},
+								"par_kürzel": {
+									"value": "@pipeline().globalParameters.par_kürzel",
+									"type": "Expression"
+								}
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {},
+					"cancelAfter": {}
+				},
+				"parameters": {
+					"par_jobId": {
+						"type": "string",
+						"defaultValue": "http-1_ING"
+					}
+				},
+				"variables": {
+					"var_targetStorageAccount": {
+						"type": "String"
+					},
+					"var_targetContainer": {
+						"type": "String"
+					},
+					"var_targetDirectory": {
+						"type": "String"
+					},
+					"var_targetFilename": {
+						"type": "String"
+					},
+					"var_baseUrl": {
+						"type": "String"
+					},
+					"var_relativeUrl": {
+						"type": "String"
+					},
+					"var_additionalHeaders": {
+						"type": "String"
+					},
+					"var_requestBody": {
+						"type": "String"
+					}
+				},
+				"folder": {
+					"name": "AMIS/1_Ingestion/HTTP"
+				},
+				"annotations": [],
+				"lastPublishTime": "2022-04-13T10:07:16Z"
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/ds_adlsJsonFile')]",
+				"[concat(variables('factoryId'), '/datasets/ds_httpBinaryFile_anonymous_noCompression')]",
+				"[concat(variables('factoryId'), '/datasets/ds_adlsBinaryFile')]",
+				"[concat(variables('factoryId'), '/pipelines/pl_writeLogToQueue')]",
+				"[concat(variables('factoryId'), '/pipelines/pl_copy_basicBinaryFileAdls')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/pl_copy_extractBinaryFileFromHttpAnonymousToAdls_TODO')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "lookup_obtainJsonConfigFile",
+						"description": "Looks up json config files to obtain job parameters.",
+						"type": "Lookup",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.01:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "JsonSource",
+								"storeSettings": {
+									"type": "AzureBlobFSReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "JsonReadSettings"
+								}
+							},
+							"dataset": {
+								"referenceName": "ds_adlsJsonFile",
+								"type": "DatasetReference",
+								"parameters": {
+									"par_storageAccount": {
+										"value": "@concat(pipeline().globalParameters.par_metadataStorageAccountName,pipeline().globalParameters.par_environment)",
+										"type": "Expression"
+									},
+									"par_container": {
+										"value": "@pipeline().globalParameters.par_jobmetadataStorageAccountContainer",
+										"type": "Expression"
+									},
+									"par_directory": {
+										"value": "@toLower(pipeline().globalParameters.par_dataflowConfigStorageAccountDirectory)",
+										"type": "Expression"
+									},
+									"par_fileName": {
+										"value": "@concat(pipeline().parameters.par_jobId,'.json')",
+										"type": "Expression"
+									},
+									"par_encoding": "Default(UTF-8)"
+								}
+							}
+						}
+					},
+					{
+						"name": "if_configFirstRowDoesNotExist_fail",
+						"description": "Checks if config file information has been obtained successfully and common variables are set if all is correct.",
+						"type": "IfCondition",
+						"dependsOn": [
+							{
+								"activity": "lookup_obtainSourceSystemConfigFile",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"expression": {
+								"value": "@not(contains(activity('lookup_obtainJsonConfigFile').output,'firstRow'))",
+								"type": "Expression"
+							},
+							"ifFalseActivities": [
+								{
+									"name": "setVariable_targetStorageAccount",
+									"type": "SetVariable",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"variableName": "var_targetStorageAccount",
+										"value": {
+											"value": "@activity('lookup_obtainJsonConfigFile').output.firstRow.adlsTarget.storageAccount",
+											"type": "Expression"
+										}
+									}
+								},
+								{
+									"name": "setVariable_targetContainer",
+									"type": "SetVariable",
+									"dependsOn": [
+										{
+											"activity": "setVariable_targetStorageAccount",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"variableName": "var_targetContainer",
+										"value": {
+											"value": "@activity('lookup_obtainJsonConfigFile').output.firstRow.adlsTarget.container",
+											"type": "Expression"
+										}
+									}
+								},
+								{
+									"name": "setVariable_targetDirectory",
+									"type": "SetVariable",
+									"dependsOn": [
+										{
+											"activity": "setVariable_targetContainer",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"variableName": "var_targetDirectory",
+										"value": {
+											"value": "@toLower(activity('lookup_obtainJsonConfigFile').output.firstRow.adlsTarget.directory)",
+											"type": "Expression"
+										}
+									}
+								},
+								{
+									"name": "setVariable_targetFilename",
+									"description": "Sets the target filename by taking the source filename and, if the according addTimestampFlag is active, by adding a timestamp to the name.",
+									"type": "SetVariable",
+									"dependsOn": [
+										{
+											"activity": "setVariable_targetDirectory",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										},
+										{
+											"activity": "setVariable_relativeUrl",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										},
+										{
+											"activity": "setVariable_requestBody",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"variableName": "var_targetFilename",
+										"value": {
+											"value": "@concat('TODO','.csv')",
+											"type": "Expression"
+										}
+									}
+								},
+								{
+									"name": "setVariable_baseUrl",
+									"type": "SetVariable",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"variableName": "var_baseUrl",
+										"value": {
+											"value": "@activity('lookup_obtainSourceSystemConfigFile').output.firstRow.baseUrl",
+											"type": "Expression"
+										}
+									}
+								},
+								{
+									"name": "setVariable_relativeUrl",
+									"type": "SetVariable",
+									"dependsOn": [
+										{
+											"activity": "setVariable_baseUrl",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"variableName": "var_relativeUrl",
+										"value": {
+											"value": "@activity('lookup_obtainJsonConfigFile').output.firstRow.httpSource.relativeUrl",
+											"type": "Expression"
+										}
+									}
+								},
+								{
+									"name": "fail_describeConfigError2",
+									"type": "Fail",
+									"dependsOn": [
+										{
+											"activity": "setVariable_targetFilename",
+											"dependencyConditions": [
+												"Skipped",
+												"Failed"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"message": "Error setting variables with the provided information from JSON config.",
+										"errorCode": "ERROR_SETTING_VARIABLES_FROM_JOB_CONFIG_INFORMATION"
+									}
+								},
+								{
+									"name": "fail_plRunMustFail2",
+									"type": "Fail",
+									"dependsOn": [
+										{
+											"activity": "executePipeline_writeErrorLog4",
+											"dependencyConditions": [
+												"Completed"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"message": "plRunMustFail",
+										"errorCode": "plRunMustFail"
+									}
+								},
+								{
+									"name": "executePipeline_writeErrorLog4",
+									"description": "Pass error information to pl_writeLogToQueue and execute it.",
+									"type": "ExecutePipeline",
+									"dependsOn": [
+										{
+											"activity": "fail_describeConfigError2",
+											"dependencyConditions": [
+												"Failed"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "pl_writeLogToQueue",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": false,
+										"parameters": {
+											"par_logType": "Error",
+											"par_logId": {
+												"value": "@activity('fail_describeConfigError2').output.errorCode",
+												"type": "Expression"
+											},
+											"par_logMessage": {
+												"value": "@activity('fail_describeConfigError2').output.message",
+												"type": "Expression"
+											},
+											"par_jobName": {
+												"value": "@pipeline().Pipeline",
+												"type": "Expression"
+											},
+											"par_jobId": {
+												"value": "@pipeline().parameters.par_jobId",
+												"type": "Expression"
+											},
+											"par_jobRunId": {
+												"value": "@pipeline().RunId",
+												"type": "Expression"
+											},
+											"par_parentJobRunId": {
+												"value": "@pipeline()?.TriggeredByPipelineRunId",
+												"type": "Expression"
+											}
+										}
+									}
+								},
+								{
+									"name": "setVariable_requestBody",
+									"type": "SetVariable",
+									"dependsOn": [
+										{
+											"activity": "setVariable_additionalHeaders",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"variableName": "var_requestBody",
+										"value": {
+											"value": "@activity('lookup_obtainJsonConfigFile').output.firstRow.httpSource.requestBody",
+											"type": "Expression"
+										}
+									}
+								},
+								{
+									"name": "setVariable_additionalHeaders",
+									"type": "SetVariable",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"variableName": "var_additionalHeaders",
+										"value": {
+											"value": "@activity('lookup_obtainJsonConfigFile').output.firstRow.httpSource.additionalHeaders",
+											"type": "Expression"
+										}
+									}
+								}
+							],
+							"ifTrueActivities": [
+								{
+									"name": "fail_describeConfigError1",
+									"type": "Fail",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"message": "Error reading job detail table, please make sure your jobId is correct",
+										"errorCode": "ERROR_READING_CONFIG_JOB_DETAIL_TABLE"
+									}
+								},
+								{
+									"name": "fail_plRunMustFail1",
+									"type": "Fail",
+									"dependsOn": [
+										{
+											"activity": "executePipeline_writeErrorLog3",
+											"dependencyConditions": [
+												"Completed"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"message": "plRunMustFail",
+										"errorCode": "plRunMustFail"
+									}
+								},
+								{
+									"name": "executePipeline_writeErrorLog3",
+									"description": "Pass error information to pl_writeLogToQueue and execute it.",
+									"type": "ExecutePipeline",
+									"dependsOn": [
+										{
+											"activity": "fail_describeConfigError1",
+											"dependencyConditions": [
+												"Failed"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "pl_writeLogToQueue",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": false,
+										"parameters": {
+											"par_logType": "Error",
+											"par_logId": {
+												"value": "@activity('fail_describeConfigError1').output.errorCode",
+												"type": "Expression"
+											},
+											"par_logMessage": {
+												"value": "@activity('fail_describeConfigError1').output.message",
+												"type": "Expression"
+											},
+											"par_jobName": {
+												"value": "@pipeline().Pipeline",
+												"type": "Expression"
+											},
+											"par_jobId": {
+												"value": "@pipeline().parameters.par_jobId",
+												"type": "Expression"
+											},
+											"par_jobRunId": {
+												"value": "@pipeline().RunId",
+												"type": "Expression"
+											},
+											"par_parentJobRunId": {
+												"value": "@pipeline()?.TriggeredByPipelineRunId",
+												"type": "Expression"
+											}
+										}
+									}
+								}
+							]
+						}
+					},
+					{
+						"name": "copy_httpGetBinaryToAdls",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "if_configFirstRowDoesNotExist_fail",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.01:00:00",
+							"retry": 3,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "BinarySource",
+								"storeSettings": {
+									"type": "HttpReadSettings",
+									"maxConcurrentConnections": {
+										"value": "@activity('lookup_obtainJsonConfigFile').output.firstRow.httpSource.maxConcurrentConnections",
+										"type": "Expression"
+									},
+									"requestMethod": {
+										"value": "@{if(contains(activity('lookup_obtainJsonConfigFile').output.firstRow.httpSource,'requestMethod'),activity('lookup_obtainJsonConfigFile').output.firstRow.httpSource.requestMethod,'GET')}",
+										"type": "Expression"
+									},
+									"additionalHeaders": {
+										"value": "@{variables('var_additionalHeaders')}",
+										"type": "Expression"
+									},
+									"requestBody": {
+										"value": "@{variables('var_requestBody')}",
+										"type": "Expression"
+									},
+									"requestTimeout": {
+										"value": "@{activity('lookup_obtainJsonConfigFile').output.firstRow.httpSource.requestTimeout}",
+										"type": "Expression"
+									}
+								},
+								"formatSettings": {
+									"type": "BinaryReadSettings"
+								}
+							},
+							"sink": {
+								"type": "BinarySink",
+								"storeSettings": {
+									"type": "AzureBlobFSWriteSettings"
+								}
+							},
+							"enableStaging": false,
+							"parallelCopies": {
+								"value": "@activity('lookup_obtainJsonConfigFile').output.firstRow.processing.degreeOfParallelism",
+								"type": "Expression"
+							},
+							"dataIntegrationUnits": {
+								"value": "@activity('lookup_obtainJsonConfigFile').output.firstRow.processing.dataIntegrationUnit",
+								"type": "Expression"
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "ds_httpBinaryFile_anonymous_noCompression",
+								"type": "DatasetReference",
+								"parameters": {
+									"par_baseUrl": {
+										"value": "@variables('var_baseUrl')",
+										"type": "Expression"
+									},
+									"par_relativeUrl": {
+										"value": "@variables('var_relativeUrl')",
+										"type": "Expression"
+									}
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "ds_adlsBinaryFile",
+								"type": "DatasetReference",
+								"parameters": {
+									"par_storageAccount": {
+										"value": "@concat(variables('var_targetStorageAccount'),pipeline().globalParameters.par_environment)",
+										"type": "Expression"
+									},
+									"par_container": {
+										"value": "@variables('var_targetContainer')",
+										"type": "Expression"
+									},
+									"par_directory": {
+										"value": "@concat(variables('var_targetDirectory'),pipeline().globalParameters.par_kürzel)",
+										"type": "Expression"
+									},
+									"par_filename": {
+										"value": "@variables('var_targetFilename')",
+										"type": "Expression"
+									}
+								}
+							}
+						]
+					},
+					{
+						"name": "if_archiveTargetFlagActive",
+						"description": "Checks if the targetfile needs to be archived and does so if necessary.",
+						"type": "IfCondition",
+						"dependsOn": [
+							{
+								"activity": "copy_httpGetBinaryToAdls",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"expression": {
+								"value": "@and(true,false)",
+								"type": "Expression"
+							},
+							"ifTrueActivities": [
+								{
+									"name": "executePipeline_archiveTargetFile",
+									"type": "ExecutePipeline",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "pl_copy_basicBinaryFileAdls",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": true,
+										"parameters": {
+											"par_jobId": {
+												"value": "@pipeline().parameters.par_jobId",
+												"type": "Expression"
+											},
+											"par_sourceStorageAccount": {
+												"value": "@concat(variables('var_targetStorageAccount'),pipeline().globalParameters.par_environment)",
+												"type": "Expression"
+											},
+											"par_sourceContainer": {
+												"value": "@variables('var_targetContainer')",
+												"type": "Expression"
+											},
+											"par_sourceDirectory": {
+												"value": "@concat(variables('var_targetDirectory'),pipeline().globalParameters.par_kürzel)",
+												"type": "Expression"
+											},
+											"par_sourceFilename": {
+												"value": "@variables('var_targetFilename')",
+												"type": "Expression"
+											},
+											"par_targetStorageAccount": {
+												"value": "@concat(pipeline().globalParameters.par_historyStorageAccountName,pipeline().globalParameters.par_environment)",
+												"type": "Expression"
+											},
+											"par_targetContainer": {
+												"value": "@pipeline().globalParameters.par_historyStorageAccountContainer",
+												"type": "Expression"
+											},
+											"par_targetDirectory": {
+												"value": "@toLower(concat('data','/', activity('lookup_obtainJsonConfigFile').output.firstRow.sourceApplicationCode, '/', activity('lookup_obtainJsonConfigFile').output.firstRow.interfaceId, '/', activity('lookup_obtainJsonConfigFile').output.firstRow.processingPhaseCode, '/', 'target'))",
+												"type": "Expression"
+											},
+											"par_targetFileName": {
+												"value": "@concat(pipeline().globalParameters.par_kürzel,'_',variables('var_targetFilename'))",
+												"type": "Expression"
+											},
+											"par_deleteFilesAfterCompletion": true
+										}
+									}
+								}
+							]
+						}
+					},
+					{
+						"name": "executePipeline_writeErrorLog1",
+						"description": "Pass error information to pl_writeLogToQueue and execute it.",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "lookup_obtainJsonConfigFile",
+								"dependencyConditions": [
+									"Failed"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "pl_writeLogToQueue",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": false,
+							"parameters": {
+								"par_logType": "Error",
+								"par_logId": {
+									"value": "@activity('lookup_obtainJsonConfigFile').Error.errorCode",
+									"type": "Expression"
+								},
+								"par_logMessage": {
+									"value": "@activity('lookup_obtainJsonConfigFile').Error.message",
+									"type": "Expression"
+								},
+								"par_jobName": {
+									"value": "@pipeline().Pipeline",
+									"type": "Expression"
+								},
+								"par_jobId": {
+									"value": "@pipeline().parameters.par_jobId",
+									"type": "Expression"
+								},
+								"par_jobRunId": {
+									"value": "@pipeline().RunId",
+									"type": "Expression"
+								},
+								"par_parentJobRunId": {
+									"value": "@pipeline()?.TriggeredByPipelineRunId",
+									"type": "Expression"
+								},
+								"par_kürzel": {
+									"value": "@pipeline().globalParameters.par_kürzel",
+									"type": "Expression"
+								}
+							}
+						}
+					},
+					{
+						"name": "executePipeline_writeErrorLog5",
+						"description": "Pass error information to pl_writeLogToQueue and execute it.",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "copy_httpGetBinaryToAdls",
+								"dependencyConditions": [
+									"Failed"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "pl_writeLogToQueue",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": false,
+							"parameters": {
+								"par_logType": "Error",
+								"par_logId": {
+									"value": "@activity('copy_httpGetBinaryToAdls').Error.errorCode",
+									"type": "Expression"
+								},
+								"par_logMessage": {
+									"value": "@activity('copy_httpGetBinaryToAdls').Error.message",
+									"type": "Expression"
+								},
+								"par_jobName": {
+									"value": "@pipeline().Pipeline",
+									"type": "Expression"
+								},
+								"par_jobId": {
+									"value": "@pipeline().parameters.par_jobId",
+									"type": "Expression"
+								},
+								"par_jobRunId": {
+									"value": "@pipeline().RunId",
+									"type": "Expression"
+								},
+								"par_parentJobRunId": {
+									"value": "@pipeline()?.TriggeredByPipelineRunId",
+									"type": "Expression"
+								}
+							}
+						}
+					},
+					{
+						"name": "executePipeline_writeSuccessLog",
+						"description": "Pass success information to pl_writeLogToQueue and execute it.",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "copy_httpGetBinaryToAdls",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "pl_writeLogToQueue",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": false,
+							"parameters": {
+								"par_logType": "Success",
+								"par_logId": "TO BE DEFINED SUCCESS_ID",
+								"par_logMessage": {
+									"value": "@concat('The file ',variables('var_targetFilename'),' was successfully extracted from ', variables('var_baseUrl'),'\\/',variables('var_relativeUrl'), ' and saved on ', variables('var_targetStorageAccount'), '.')",
+									"type": "Expression"
+								},
+								"par_jobName": {
+									"value": "@pipeline().Pipeline",
+									"type": "Expression"
+								},
+								"par_jobId": {
+									"value": "@pipeline().parameters.par_jobId",
+									"type": "Expression"
+								},
+								"par_jobRunId": {
+									"value": "@pipeline().RunId",
+									"type": "Expression"
+								},
+								"par_parentJobRunId": {
+									"value": "@pipeline()?.TriggeredByPipelineRunId",
+									"type": "Expression"
+								}
+							}
+						}
+					},
+					{
+						"name": "lookup_obtainSourceSystemConfigFile",
+						"type": "Lookup",
+						"dependsOn": [
+							{
+								"activity": "lookup_obtainJsonConfigFile",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.01:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "JsonSource",
+								"storeSettings": {
+									"type": "AzureBlobFSReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "JsonReadSettings"
+								}
+							},
+							"dataset": {
+								"referenceName": "ds_adlsJsonFile",
+								"type": "DatasetReference",
+								"parameters": {
+									"par_storageAccount": {
+										"value": "@concat(pipeline().globalParameters.par_metadataStorageAccountName,pipeline().globalParameters.par_environment)",
+										"type": "Expression"
+									},
+									"par_container": {
+										"value": "@pipeline().globalParameters.par_jobmetadataStorageAccountContainer",
+										"type": "Expression"
+									},
+									"par_directory": {
+										"value": "@toLower(pipeline().globalParameters.par_systemConfigStorageAccountDirectory)",
+										"type": "Expression"
+									},
+									"par_fileName": {
+										"value": "@concat(activity('lookup_obtainJsonConfigFile').output.firstrow.sourceSystemCode,'_',activity('lookup_obtainJsonConfigFile').output.firstrow.sourceProtocolCode,'_',toUpper(pipeline().globalParameters.par_environment),'.json')",
+										"type": "Expression"
+									},
+									"par_encoding": "Default(UTF-8)"
+								}
+							}
+						}
+					},
+					{
+						"name": "executePipeline_writeErrorLog2",
+						"description": "Pass error information to pl_writeLogToQueue and execute it.",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "lookup_obtainSourceSystemConfigFile",
+								"dependencyConditions": [
+									"Failed"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "pl_writeLogToQueue",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": false,
+							"parameters": {
+								"par_logType": "Error",
+								"par_logId": {
+									"value": "@activity('lookup_obtainSourceSystemConfigFile').Error.errorCode",
+									"type": "Expression"
+								},
+								"par_logMessage": {
+									"value": "@activity('lookup_obtainSourceSystemConfigFile').Error.message",
+									"type": "Expression"
+								},
+								"par_jobName": {
+									"value": "@pipeline().Pipeline",
+									"type": "Expression"
+								},
+								"par_jobId": {
+									"value": "@pipeline().parameters.par_jobId",
+									"type": "Expression"
+								},
+								"par_jobRunId": {
+									"value": "@pipeline().RunId",
+									"type": "Expression"
+								},
+								"par_parentJobRunId": {
+									"value": "@pipeline()?.TriggeredByPipelineRunId",
+									"type": "Expression"
+								},
+								"par_kürzel": {
+									"value": "@pipeline().globalParameters.par_kürzel",
+									"type": "Expression"
+								}
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {},
+					"cancelAfter": {}
+				},
+				"parameters": {
+					"par_jobId": {
+						"type": "string",
+						"defaultValue": "http-1_ING"
+					}
+				},
+				"variables": {
+					"var_targetStorageAccount": {
+						"type": "String"
+					},
+					"var_targetContainer": {
+						"type": "String"
+					},
+					"var_targetDirectory": {
+						"type": "String"
+					},
+					"var_targetFilename": {
+						"type": "String"
+					},
+					"var_baseUrl": {
+						"type": "String"
+					},
+					"var_relativeUrl": {
+						"type": "String"
+					},
+					"var_additionalHeaders": {
+						"type": "String"
+					},
+					"var_requestBody": {
+						"type": "String"
+					}
+				},
+				"folder": {
+					"name": "Übung 3"
+				},
+				"annotations": [],
+				"lastPublishTime": "2022-04-13T10:07:16Z"
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/ds_adlsJsonFile')]",
+				"[concat(variables('factoryId'), '/datasets/ds_httpBinaryFile_anonymous_noCompression')]",
+				"[concat(variables('factoryId'), '/datasets/ds_adlsBinaryFile')]",
+				"[concat(variables('factoryId'), '/pipelines/pl_writeLogToQueue')]",
+				"[concat(variables('factoryId'), '/pipelines/pl_copy_basicBinaryFileAdls')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/pl_copy_oneCsvFileFromFolderAdlsToAdls')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Testing a generic pipeline that uses the given jobID string to dynamically read data from a config table for a copy. activity moving all files from a certain ADLS storage to another one. Missing file mask feature",
+				"activities": [
+					{
+						"name": "copy_csvAdlsToAdls",
+						"description": "Copy a file from the source adls store to the destination adls store.",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "if_sourceSchemaFileNameSpecified",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "if_archiveSourceFlagActive",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "lookup_obtainJsonMappingFile",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "setVariable_targetFilename",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.01:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "DelimitedTextSource",
+								"storeSettings": {
+									"type": "AzureBlobFSReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "DelimitedTextReadSettings"
+								},
+								"recursive": false
+							},
+							"sink": {
+								"type": "DelimitedTextSink",
+								"storeSettings": {
+									"type": "AzureBlobFSWriteSettings"
+								},
+								"formatSettings": {
+									"type": "DelimitedTextWriteSettings",
+									"quoteAllText": true,
+									"fileExtension": ".txt"
+								}
+							},
+							"enableStaging": false,
+							"parallelCopies": {
+								"value": "@activity('lookup_obtainJsonConfigFile').output.firstRow.processing.degreeOfParallelism",
+								"type": "Expression"
+							},
+							"dataIntegrationUnits": {
+								"value": "@activity('lookup_obtainJsonConfigFile').output.firstRow.processing.dataIntegrationUnit",
+								"type": "Expression"
+							},
+							"translator": {
+								"value": "@if(contains(activity('lookup_obtainJsonMappingFile').output,'firstRow'),activity('lookup_obtainJsonMappingFile').output.firstRow, json('{\n\"type\": \"TabularTranslator\",\n\"typeConversion\": false,\n\"typeConversionSettings\": {\n    \"allowDataTruncation\": false,\n    \"treatBooleanAsNumber\": false\n\t}\n}'))",
+								"type": "Expression"
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "ds_adlsCsvFile",
+								"type": "DatasetReference",
+								"parameters": {
+									"par_storageAccount": {
+										"value": "@concat(activity('lookup_obtainJsonConfigFile').output.firstRow.adlsSource.storageAccount,pipeline().globalParameters.par_environment)",
+										"type": "Expression"
+									},
+									"par_container": {
+										"value": "@activity('lookup_obtainJsonConfigFile').output.firstRow.adlsSource.container",
+										"type": "Expression"
+									},
+									"par_directory": {
+										"value": "@toLower(activity('lookup_obtainJsonConfigFile').output.firstRow.adlsSource.directory)",
+										"type": "Expression"
+									},
+									"par_filename": {
+										"value": "@pipeline().parameters.par_sourceFileName",
+										"type": "Expression"
+									},
+									"par_columnDelimiter": {
+										"value": "@activity('lookup_obtainJsonConfigFile').output.firstRow.csvSource.columnDelimiter",
+										"type": "Expression"
+									},
+									"par_encoding": {
+										"value": "@activity('lookup_obtainJsonConfigFile').output.firstRow.csvSource.encoding",
+										"type": "Expression"
+									},
+									"par_escapeCharacter": {
+										"value": "@activity('lookup_obtainJsonConfigFile').output.firstRow.csvSource.escapeCharacter",
+										"type": "Expression"
+									},
+									"par_quoteCharacter": {
+										"value": "@activity('lookup_obtainJsonConfigFile').output.firstRow.csvSource.quoteCharacter",
+										"type": "Expression"
+									},
+									"par_firstRowAsHeader": {
+										"value": "@activity('lookup_obtainJsonConfigFile').output.firstRow.csvSource.firstRowAsHeader",
+										"type": "Expression"
+									},
+									"par_compressionType": {
+										"value": "@activity('lookup_obtainJsonConfigFile').output.firstRow.csvSource.compressionType",
+										"type": "Expression"
+									},
+									"par_compressionLevel": {
+										"value": "@activity('lookup_obtainJsonConfigFile').output.firstRow.csvSource.compressionLevel",
+										"type": "Expression"
+									},
+									"par_nullValue": {
+										"value": "@if(contains(activity('lookup_obtainJsonConfigFile').output.firstRow.csvSource,'nullValue'),activity('lookup_obtainJsonConfigFile').output.firstRow.csvSource.nullValue, '')",
+										"type": "Expression"
+									},
+									"par_rowDelimiter": {
+										"value": "@activity('lookup_obtainJsonConfigFile').output.firstRow.csvSource.rowDelimiter",
+										"type": "Expression"
+									}
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "ds_adlsCsvFile",
+								"type": "DatasetReference",
+								"parameters": {
+									"par_storageAccount": {
+										"value": "@concat(activity('lookup_obtainJsonConfigFile').output.firstRow.adlsTarget.storageAccount,pipeline().globalParameters.par_environment)",
+										"type": "Expression"
+									},
+									"par_container": {
+										"value": "@activity('lookup_obtainJsonConfigFile').output.firstRow.adlsTarget.container",
+										"type": "Expression"
+									},
+									"par_directory": {
+										"value": "@toLower(activity('lookup_obtainJsonConfigFile').output.firstRow.adlsTarget.directory)",
+										"type": "Expression"
+									},
+									"par_filename": {
+										"value": "@variables('var_targetFilename')",
+										"type": "Expression"
+									},
+									"par_columnDelimiter": {
+										"value": "@activity('lookup_obtainJsonConfigFile').output.firstRow.csvTarget.columnDelimiter",
+										"type": "Expression"
+									},
+									"par_encoding": {
+										"value": "@activity('lookup_obtainJsonConfigFile').output.firstRow.csvTarget.encoding",
+										"type": "Expression"
+									},
+									"par_escapeCharacter": {
+										"value": "@activity('lookup_obtainJsonConfigFile').output.firstRow.csvTarget.escapeCharacter",
+										"type": "Expression"
+									},
+									"par_quoteCharacter": {
+										"value": "@activity('lookup_obtainJsonConfigFile').output.firstRow.csvTarget.quoteCharacter",
+										"type": "Expression"
+									},
+									"par_firstRowAsHeader": {
+										"value": "@activity('lookup_obtainJsonConfigFile').output.firstRow.csvTarget.firstRowAsHeader",
+										"type": "Expression"
+									},
+									"par_compressionType": {
+										"value": "@activity('lookup_obtainJsonConfigFile').output.firstRow.csvTarget.compressionType",
+										"type": "Expression"
+									},
+									"par_compressionLevel": {
+										"value": "@activity('lookup_obtainJsonConfigFile').output.firstRow.csvTarget.compressionLevel",
+										"type": "Expression"
+									},
+									"par_nullValue": {
+										"value": "@if(contains(activity('lookup_obtainJsonConfigFile').output.firstRow.csvTarget,'nullValue'),activity('lookup_obtainJsonConfigFile').output.firstRow.csvTarget.nullValue, '')",
+										"type": "Expression"
+									},
+									"par_rowDelimiter": {
+										"value": "@activity('lookup_obtainJsonConfigFile').output.firstRow.csvTarget.rowDelimiter",
+										"type": "Expression"
+									}
+								}
+							}
+						]
+					},
+					{
+						"name": "if_archiveTargetFlagActive",
+						"description": "Checks if the targetfile needs to be archived and does so if necessary.",
+						"type": "IfCondition",
+						"dependsOn": [
+							{
+								"activity": "copy_csvAdlsToAdls",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"expression": {
+								"value": "@activity('lookup_obtainJsonConfigFile').output.firstRow.archiveTargetFlag",
+								"type": "Expression"
+							},
+							"ifTrueActivities": [
+								{
+									"name": "executePipeline_archiveTargetFile",
+									"type": "ExecutePipeline",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "pl_copy_basicBinaryFileAdls",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": false,
+										"parameters": {
+											"par_jobId": {
+												"value": "@pipeline().parameters.par_jobId",
+												"type": "Expression"
+											},
+											"par_sourceStorageAccount": {
+												"value": "@concat(activity('lookup_obtainJsonConfigFile').output.firstRow.adlsTarget.storageAccount,pipeline().globalParameters.par_environment)",
+												"type": "Expression"
+											},
+											"par_sourceContainer": {
+												"value": "@activity('lookup_obtainJsonConfigFile').output.firstRow.adlsTarget.container",
+												"type": "Expression"
+											},
+											"par_sourceDirectory": {
+												"value": "@toLower(activity('lookup_obtainJsonConfigFile').output.firstRow.adlsTarget.directory)",
+												"type": "Expression"
+											},
+											"par_sourceFilename": {
+												"value": "@variables('var_targetFilename')",
+												"type": "Expression"
+											},
+											"par_targetStorageAccount": {
+												"value": "@concat(pipeline().globalParameters.par_historyStorageAccountName,pipeline().globalParameters.par_environment)",
+												"type": "Expression"
+											},
+											"par_targetContainer": {
+												"value": "@pipeline().globalParameters.par_historyStorageAccountContainer",
+												"type": "Expression"
+											},
+											"par_targetDirectory": {
+												"value": "@toLower(concat('data','/', activity('lookup_obtainJsonConfigFile').output.firstRow.sourceApplicationCode, '/', activity('lookup_obtainJsonConfigFile').output.firstRow.interfaceId, '/', activity('lookup_obtainJsonConfigFile').output.firstRow.processingPhaseCode, '/', 'target'))",
+												"type": "Expression"
+											},
+											"par_targetFileName": {
+												"value": "@variables('var_targetFilename')",
+												"type": "Expression"
+											},
+											"par_deleteFilesAfterCompletion": false,
+											"par_impact": "2",
+											"par_urgency": "2",
+											"par_ticketTitle": "Archiving target file to history failed.",
+											"par_ticketDescription": "Archiving the successfuly copied target file to the history container failed.",
+											"par_recipientLeanIxId": "null",
+											"par_businessSupportGroup": {
+												"value": "@activity('lookup_obtainJsonConfigFile').output.firstRow.businessNotification",
+												"type": "Expression"
+											},
+											"par_technicalSupportGroup": {
+												"value": "@activity('lookup_obtainJsonConfigFile').output.firstRow.technicalNotification",
+												"type": "Expression"
+											}
+										}
+									}
+								}
+							]
+						}
+					},
+					{
+						"name": "setVariable_nowTime",
+						"description": "Sets the now time for this iteration.",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "lookup_obtainJsonConfigFile",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "var_nowTime",
+							"value": {
+								"value": "@formatDateTime(utcnow(),activity('lookup_obtainJsonConfigFile').output.firstRow.setTimestampFormat)",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "if_archiveSourceFlagActive",
+						"description": "Checks if the source file needs to be archived and does so if necessary.",
+						"type": "IfCondition",
+						"dependsOn": [
+							{
+								"activity": "lookup_obtainJsonConfigFile",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"expression": {
+								"value": "@activity('lookup_obtainJsonConfigFile').output.firstRow.archiveSourceFlag",
+								"type": "Expression"
+							},
+							"ifTrueActivities": [
+								{
+									"name": "executePipeline_archiveSourceFile",
+									"type": "ExecutePipeline",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "pl_copy_basicBinaryFileAdls",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": false,
+										"parameters": {
+											"par_jobId": {
+												"value": "@pipeline().parameters.par_jobId",
+												"type": "Expression"
+											},
+											"par_sourceStorageAccount": {
+												"value": "@concat(activity('lookup_obtainJsonConfigFile').output.firstRow.adlsSource.storageAccount,pipeline().globalParameters.par_environment)",
+												"type": "Expression"
+											},
+											"par_sourceContainer": {
+												"value": "@activity('lookup_obtainJsonConfigFile').output.firstRow.adlsSource.container",
+												"type": "Expression"
+											},
+											"par_sourceDirectory": {
+												"value": "@toLower(activity('lookup_obtainJsonConfigFile').output.firstRow.adlsSource.directory)",
+												"type": "Expression"
+											},
+											"par_sourceFilename": {
+												"value": "@pipeline().parameters.par_sourceFileName",
+												"type": "Expression"
+											},
+											"par_targetStorageAccount": {
+												"value": "@concat(pipeline().globalParameters.par_historyStorageAccountName,pipeline().globalParameters.par_environment)",
+												"type": "Expression"
+											},
+											"par_targetContainer": {
+												"value": "@pipeline().globalParameters.par_historyStorageAccountContainer",
+												"type": "Expression"
+											},
+											"par_targetDirectory": {
+												"value": "@toLower(concat('data','/', activity('lookup_obtainJsonConfigFile').output.firstRow.sourceApplicationCode, '/', activity('lookup_obtainJsonConfigFile').output.firstRow.interfaceId, '/', activity('lookup_obtainJsonConfigFile').output.firstRow.processingPhaseCode, '/', 'source'))",
+												"type": "Expression"
+											},
+											"par_targetFileName": {
+												"value": "@pipeline().parameters.par_sourceFileName",
+												"type": "Expression"
+											},
+											"par_deleteFilesAfterCompletion": false,
+											"par_impact": "2",
+											"par_urgency": "2",
+											"par_ticketTitle": "Archiving source file to history failed.",
+											"par_ticketDescription": "Archiving the source file to the history container failed.",
+											"par_recipientLeanIxId": "null",
+											"par_businessSupportGroup": {
+												"value": "@activity('lookup_obtainJsonConfigFile').output.firstRow.businessNotification",
+												"type": "Expression"
+											},
+											"par_technicalSupportGroup": {
+												"value": "@activity('lookup_obtainJsonConfigFile').output.firstRow.technicalNotification",
+												"type": "Expression"
+											}
+										}
+									}
+								}
+							]
+						}
+					},
+					{
+						"name": "setVariable_targetFilename",
+						"description": "Sets the target filename by taking the source filename and, if the according addTimestampFlag is active, by adding a timestamp to the name.",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "setVariable_nowTime",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "var_targetFilename",
+							"value": {
+								"value": "@concat(if(and(contains(activity('lookup_obtainJsonConfigFile').output.firstRow,'targetFilePrefix'), not(equals(trim(activity('lookup_obtainJsonConfigFile').output.firstRow.targetFilePrefix),''))), activity('lookup_obtainJsonConfigFile').output.firstRow.targetFilePrefix, split(pipeline().parameters.par_sourceFileName,'.')[0]),if(activity('lookup_obtainJsonConfigFile').output.firstRow.addTimestampFlag, formatDateTime(utcnow(),activity('lookup_obtainJsonConfigFile').output.firstRow.setTimestampformat),''),if(contains(activity('lookup_obtainJsonConfigFile').output.firstRow,'targetFileExtension'), activity('lookup_obtainJsonConfigFile').output.firstRow.targetFileExtension, split(pipeline().parameters.par_sourceFileName,'.')[1]))",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "executePipeline_writeErrorLog4",
+						"description": "Pass error information to pl_writeLogToQueue and execute it.",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "copy_csvAdlsToAdls",
+								"dependencyConditions": [
+									"Failed"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "pl_writeLogToQueue",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": false,
+							"parameters": {
+								"par_logType": "Error",
+								"par_logId": {
+									"value": "@activity('copy_csvAdlsToAdls').Error.errorCode",
+									"type": "Expression"
+								},
+								"par_logMessage": {
+									"value": "@activity('copy_csvAdlsToAdls').Error.message",
+									"type": "Expression"
+								},
+								"par_jobName": {
+									"value": "@pipeline().Pipeline",
+									"type": "Expression"
+								},
+								"par_jobId": {
+									"value": "@pipeline().parameters.par_jobId",
+									"type": "Expression"
+								},
+								"par_jobRunId": {
+									"value": "@pipeline().RunId",
+									"type": "Expression"
+								},
+								"par_groupId": {
+									"value": "@pipeline().GroupId",
+									"type": "Expression"
+								},
+								"par_triggerId": {
+									"value": "@pipeline().TriggerId",
+									"type": "Expression"
+								},
+								"par_triggerName": {
+									"value": "@pipeline().TriggerName",
+									"type": "Expression"
+								},
+								"par_triggerTime": {
+									"value": "@pipeline().TriggerTime",
+									"type": "Expression"
+								},
+								"par_parentJobRunId": {
+									"value": "@pipeline()?.TriggeredByPipelineRunId",
+									"type": "Expression"
+								},
+								"par_impact": "3",
+								"par_urgency": "3",
+								"par_ticketTitle": "An error occured during the binary copy from the ADLS source to the ADLS target.",
+								"par_ticketDescription": {
+									"value": "@concat('The following error occured during the binary copy from an ADLS source to the ADLS target. Please resolve issue as soon as possible.','\nError message: ',activity('copy_csvAdlsToAdls').Error.message,'\nThe file for which the error occured will be moved into the ', pipeline().globalParameters.par_failedContainerName,' container of ', concat(activity('lookup_obtainJsonConfigFile').output.firstRow.adlsSource.storageAccount,pipeline().globalParameters.par_environment), ' and can be found under the following directory: ',toLower(activity('lookup_obtainJsonConfigFile').output.firstRow.adlsSource.directory))",
+									"type": "Expression"
+								},
+								"par_recipientLeanIxId": "null",
+								"par_businessSupportGroup": "null",
+								"par_technicalSupportGroup": "null"
+							}
+						}
+					},
+					{
+						"name": "executePipeline_writeSuccessLog",
+						"description": "Pass success information to pl_writeLogToQueue and execute it.",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "if_targetSchemaFileNameSpecified",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "pl_writeLogToQueue",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": false,
+							"parameters": {
+								"par_logType": "Success",
+								"par_logId": "TO BE DEFINED SUCCESS_ID",
+								"par_logMessage": {
+									"value": "@concat('The file ',variables('var_targetFilename'),' was successfully copied from ', concat(activity('lookup_obtainJsonConfigFile').output.firstRow.adlsSource.storageAccount,pipeline().globalParameters.par_environment), ' to ', concat(activity('lookup_obtainJsonConfigFile').output.firstRow.adlsTarget.storageAccount,pipeline().globalParameters.par_environment), '.')",
+									"type": "Expression"
+								},
+								"par_jobName": {
+									"value": "@pipeline().Pipeline",
+									"type": "Expression"
+								},
+								"par_jobId": {
+									"value": "@pipeline().parameters.par_jobId",
+									"type": "Expression"
+								},
+								"par_jobRunId": {
+									"value": "@pipeline().RunId",
+									"type": "Expression"
+								},
+								"par_groupId": {
+									"value": "@pipeline().GroupId",
+									"type": "Expression"
+								},
+								"par_triggerId": {
+									"value": "@pipeline().TriggerId",
+									"type": "Expression"
+								},
+								"par_triggerName": {
+									"value": "@pipeline().TriggerName",
+									"type": "Expression"
+								},
+								"par_triggerTime": {
+									"value": "@pipeline().TriggerTime",
+									"type": "Expression"
+								},
+								"par_parentJobRunId": {
+									"value": "@pipeline()?.TriggeredByPipelineRunId",
+									"type": "Expression"
+								}
+							}
+						}
+					},
+					{
+						"name": "if_createWarningIfNoDataIsTransferredFlagActive",
+						"type": "IfCondition",
+						"dependsOn": [
+							{
+								"activity": "copy_csvAdlsToAdls",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"expression": {
+								"value": "@and(activity('lookup_obtainJsonConfigFile').output.firstRow.createWarningIfNoDataIsTransferredFlag, or(equals(activity('copy_csvAdlsToAdls').output.dataRead,0),equals(activity('copy_csvAdlsToAdls').output.dataWritten,0)))",
+								"type": "Expression"
+							},
+							"ifTrueActivities": [
+								{
+									"name": "executePipeline_writeWarningLog2",
+									"description": "Pass success information to pl_writeLogToQueue and execute it.",
+									"type": "ExecutePipeline",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "pl_writeLogToQueue",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": false,
+										"parameters": {
+											"par_logType": "Warning",
+											"par_logId": "TO BE DEFINED WARNING_ID",
+											"par_logMessage": {
+												"value": "@concat('Warning: No data has been transfered for file ', variables('var_targetFilename'), '.')",
+												"type": "Expression"
+											},
+											"par_jobName": {
+												"value": "@pipeline().Pipeline",
+												"type": "Expression"
+											},
+											"par_jobId": {
+												"value": "@pipeline().parameters.par_jobId",
+												"type": "Expression"
+											},
+											"par_jobRunId": {
+												"value": "@pipeline().RunId",
+												"type": "Expression"
+											},
+											"par_groupId": {
+												"value": "@pipeline().GroupId",
+												"type": "Expression"
+											},
+											"par_triggerId": {
+												"value": "@pipeline().TriggerId",
+												"type": "Expression"
+											},
+											"par_triggerName": {
+												"value": "@pipeline().TriggerName",
+												"type": "Expression"
+											},
+											"par_triggerTime": {
+												"value": "@pipeline().TriggerTime",
+												"type": "Expression"
+											},
+											"par_parentJobRunId": {
+												"value": "@pipeline()?.TriggeredByPipelineRunId",
+												"type": "Expression"
+											}
+										}
+									}
+								}
+							]
+						}
+					},
+					{
+						"name": "if_sourceSchemaFileNameSpecified",
+						"type": "IfCondition",
+						"dependsOn": [
+							{
+								"activity": "lookup_obtainJsonConfigFile",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"expression": {
+								"value": "@not(empty(trim(activity('lookup_obtainJsonConfigFile').output.firstRow.sourceSchemaFileName)))",
+								"type": "Expression"
+							},
+							"ifTrueActivities": [
+								{
+									"name": "executePipeline_validateSchema_source",
+									"type": "ExecutePipeline",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "pl_validateFileSchema",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": true,
+										"parameters": {
+											"par_filename": {
+												"value": "@pipeline().parameters.par_sourceFileName",
+												"type": "Expression"
+											},
+											"par_jobId": {
+												"value": "@pipeline().parameters.par_jobId",
+												"type": "Expression"
+											},
+											"par_isSourceFile": true
+										}
+									}
+								},
+								{
+									"name": "executePipeline_writeErrorLog3",
+									"description": "Pass error information to pl_writeLogToQueue and execute it.",
+									"type": "ExecutePipeline",
+									"dependsOn": [
+										{
+											"activity": "executePipeline_validateSchema_source",
+											"dependencyConditions": [
+												"Failed"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "pl_writeLogToQueue",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": false,
+										"parameters": {
+											"par_logType": "Error",
+											"par_logId": {
+												"value": "@activity('executePipeline_validateSchema_source').Error.errorCode",
+												"type": "Expression"
+											},
+											"par_logMessage": {
+												"value": "@activity('executePipeline_validateSchema_source').Error.message",
+												"type": "Expression"
+											},
+											"par_jobName": {
+												"value": "@pipeline().Pipeline",
+												"type": "Expression"
+											},
+											"par_jobId": {
+												"value": "@pipeline().parameters.par_jobId",
+												"type": "Expression"
+											},
+											"par_jobRunId": {
+												"value": "@pipeline().RunId",
+												"type": "Expression"
+											},
+											"par_groupId": {
+												"value": "@pipeline().GroupId",
+												"type": "Expression"
+											},
+											"par_triggerId": {
+												"value": "@pipeline().TriggerId",
+												"type": "Expression"
+											},
+											"par_triggerName": {
+												"value": "@pipeline().TriggerName",
+												"type": "Expression"
+											},
+											"par_triggerTime": {
+												"value": "@pipeline().TriggerTime",
+												"type": "Expression"
+											},
+											"par_parentJobRunId": {
+												"value": "@pipeline()?.TriggeredByPipelineRunId",
+												"type": "Expression"
+											},
+											"par_impact": "3",
+											"par_urgency": "3",
+											"par_ticketTitle": "Invalid source file schema.",
+											"par_ticketDescription": {
+												"value": "@concat('The following error occured during the schema validation of the following file: ',pipeline().parameters.par_sourceFileName, '. Error message: ',activity('executePipeline_validateSchema_source').Error.message)",
+												"type": "Expression"
+											},
+											"par_recipientLeanIxId": "null",
+											"par_businessSupportGroup": "null",
+											"par_technicalSupportGroup": "null"
+										}
+									}
+								},
+								{
+									"name": "fail_plRunMustFail1",
+									"type": "Fail",
+									"dependsOn": [
+										{
+											"activity": "executePipeline_writeErrorLog3",
+											"dependencyConditions": [
+												"Completed"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"message": "plRunMustFail",
+										"errorCode": "plRunMustFail"
+									}
+								}
+							]
+						}
+					},
+					{
+						"name": "if_deleteAfterCopyFlagActive",
+						"type": "IfCondition",
+						"dependsOn": [
+							{
+								"activity": "if_targetSchemaFileNameSpecified",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"expression": {
+								"value": "@activity('lookup_obtainJsonConfigFile').output.firstRow.deleteAfterCopyFlag",
+								"type": "Expression"
+							},
+							"ifTrueActivities": [
+								{
+									"name": "executePipeline_deleteSourceFileAfterCopy",
+									"type": "ExecutePipeline",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "pl_delete_basicBinaryFileAdls",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": false,
+										"parameters": {
+											"par_jobId": {
+												"value": "@pipeline().parameters.par_jobId",
+												"type": "Expression"
+											},
+											"par_storageAccount": {
+												"value": "@concat(activity('lookup_obtainJsonConfigFile').output.firstRow.adlsSource.storageAccount,pipeline().globalParameters.par_environment)",
+												"type": "Expression"
+											},
+											"par_container": {
+												"value": "@activity('lookup_obtainJsonConfigFile').output.firstRow.adlsSource.container",
+												"type": "Expression"
+											},
+											"par_directory": {
+												"value": "@toLower(activity('lookup_obtainJsonConfigFile').output.firstRow.adlsSource.directory)",
+												"type": "Expression"
+											},
+											"par_filename": {
+												"value": "@pipeline().parameters.par_sourceFileName",
+												"type": "Expression"
+											},
+											"par_impact": "2",
+											"par_urgency": "2",
+											"par_ticketTitle": "Deleting source file after successful copy failed.",
+											"par_ticketDescription": "Deleting the source file after successfully copying it to the target failed.",
+											"par_recipientLeanIxId": "null",
+											"par_businessSupportGroup": {
+												"value": "@activity('lookup_obtainJsonConfigFile').output.firstRow.businessNotification",
+												"type": "Expression"
+											},
+											"par_technicalSupportGroup": {
+												"value": "@activity('lookup_obtainJsonConfigFile').output.firstRow.technicalNotification",
+												"type": "Expression"
+											}
+										}
+									}
+								}
+							]
+						}
+					},
+					{
+						"name": "if_targetSchemaFileNameSpecified",
+						"type": "IfCondition",
+						"dependsOn": [
+							{
+								"activity": "if_archiveTargetFlagActive",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"expression": {
+								"value": "@not(empty(trim(activity('lookup_obtainJsonConfigFile').output.firstRow.targetSchemaFileName)))",
+								"type": "Expression"
+							},
+							"ifTrueActivities": [
+								{
+									"name": "executePipeline_validateSchema_target",
+									"type": "ExecutePipeline",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "pl_validateFileSchema",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": true,
+										"parameters": {
+											"par_filename": {
+												"value": "@variables('var_targetFilename')",
+												"type": "Expression"
+											},
+											"par_jobId": {
+												"value": "@pipeline().parameters.par_jobId",
+												"type": "Expression"
+											},
+											"par_isSourceFile": false
+										}
+									}
+								},
+								{
+									"name": "executePipeline_writeErrorLog5",
+									"description": "Pass error information to pl_writeLogToQueue and execute it.",
+									"type": "ExecutePipeline",
+									"dependsOn": [
+										{
+											"activity": "executePipeline_validateSchema_target",
+											"dependencyConditions": [
+												"Failed"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "pl_writeLogToQueue",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": false,
+										"parameters": {
+											"par_logType": "Error",
+											"par_logId": {
+												"value": "@activity('executePipeline_validateSchema_target').Error.errorCode",
+												"type": "Expression"
+											},
+											"par_logMessage": {
+												"value": "@activity('executePipeline_validateSchema_target').Error.message",
+												"type": "Expression"
+											},
+											"par_jobName": {
+												"value": "@pipeline().Pipeline",
+												"type": "Expression"
+											},
+											"par_jobId": {
+												"value": "@pipeline().parameters.par_jobId",
+												"type": "Expression"
+											},
+											"par_jobRunId": {
+												"value": "@pipeline().RunId",
+												"type": "Expression"
+											},
+											"par_groupId": {
+												"value": "@pipeline().GroupId",
+												"type": "Expression"
+											},
+											"par_triggerId": {
+												"value": "@pipeline().TriggerId",
+												"type": "Expression"
+											},
+											"par_triggerName": {
+												"value": "@pipeline().TriggerName",
+												"type": "Expression"
+											},
+											"par_triggerTime": {
+												"value": "@pipeline().TriggerTime",
+												"type": "Expression"
+											},
+											"par_parentJobRunId": {
+												"value": "@pipeline()?.TriggeredByPipelineRunId",
+												"type": "Expression"
+											},
+											"par_impact": "3",
+											"par_urgency": "3",
+											"par_ticketTitle": "Invalid target file schema.",
+											"par_ticketDescription": {
+												"value": "@concat('The following error occured during the schema validation of the following file: ',variables('var_targetFilename'), '. Error message: ',activity('executePipeline_validateSchema_target').Error.message)",
+												"type": "Expression"
+											},
+											"par_recipientLeanIxId": "null",
+											"par_businessSupportGroup": "null",
+											"par_technicalSupportGroup": "null"
+										}
+									}
+								},
+								{
+									"name": "fail_plRunMustFail2",
+									"type": "Fail",
+									"dependsOn": [
+										{
+											"activity": "executePipeline_writeErrorLog5",
+											"dependencyConditions": [
+												"Completed"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"message": "plRunMustFail",
+										"errorCode": "plRunMustFail"
+									}
+								}
+							]
+						}
+					},
+					{
+						"name": "lookup_obtainJsonConfigFile",
+						"description": "Looks up json config files to obtain job parameters.",
+						"type": "Lookup",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.01:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "JsonSource",
+								"storeSettings": {
+									"type": "AzureBlobFSReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "JsonReadSettings"
+								}
+							},
+							"dataset": {
+								"referenceName": "ds_adlsJsonFile",
+								"type": "DatasetReference",
+								"parameters": {
+									"par_storageAccount": {
+										"value": "@concat(pipeline().globalParameters.par_metadataStorageAccountName,pipeline().globalParameters.par_environment)",
+										"type": "Expression"
+									},
+									"par_container": {
+										"value": "@pipeline().globalParameters.par_jobmetadataStorageAccountContainer",
+										"type": "Expression"
+									},
+									"par_directory": {
+										"value": "@toLower(pipeline().globalParameters.par_dataflowConfigStorageAccountDirectory)",
+										"type": "Expression"
+									},
+									"par_fileName": {
+										"value": "@concat(pipeline().parameters.par_jobId,'.json')",
+										"type": "Expression"
+									},
+									"par_encoding": "Default(UTF-8)"
+								}
+							}
+						}
+					},
+					{
+						"name": "executePipeline_writeErrorLog1",
+						"description": "Pass error information to pl_writeLogToQueue and execute it.",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "lookup_obtainJsonConfigFile",
+								"dependencyConditions": [
+									"Failed"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "pl_writeLogToQueue",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": false,
+							"parameters": {
+								"par_logType": "Error",
+								"par_logId": {
+									"value": "@activity('lookup_obtainJsonConfigFile').Error.errorCode",
+									"type": "Expression"
+								},
+								"par_logMessage": {
+									"value": "@activity('lookup_obtainJsonConfigFile').Error.message",
+									"type": "Expression"
+								},
+								"par_jobName": {
+									"value": "@pipeline().Pipeline",
+									"type": "Expression"
+								},
+								"par_jobId": {
+									"value": "@pipeline().parameters.par_jobId",
+									"type": "Expression"
+								},
+								"par_jobRunId": {
+									"value": "@pipeline().RunId",
+									"type": "Expression"
+								},
+								"par_groupId": {
+									"value": "@pipeline().GroupId",
+									"type": "Expression"
+								},
+								"par_triggerId": {
+									"value": "@pipeline().TriggerId",
+									"type": "Expression"
+								},
+								"par_triggerName": {
+									"value": "@pipeline().TriggerName",
+									"type": "Expression"
+								},
+								"par_triggerTime": {
+									"value": "@pipeline().TriggerTime",
+									"type": "Expression"
+								},
+								"par_parentJobRunId": {
+									"value": "@pipeline()?.TriggeredByPipelineRunId",
+									"type": "Expression"
+								},
+								"par_impact": "3",
+								"par_urgency": "3",
+								"par_ticketTitle": "Reading JSON config file is not working.",
+								"par_ticketDescription": {
+									"value": "@concat('Reading of JSON config file from metadata storage account is not working. Please resolve issue as soon as possible. Error message: ',activity('lookup_obtainJsonConfigFile').Error.message)",
+									"type": "Expression"
+								},
+								"par_recipientLeanIxId": "null",
+								"par_businessSupportGroup": "null",
+								"par_technicalSupportGroup": "null"
+							}
+						}
+					},
+					{
+						"name": "lookup_obtainJsonMappingFile",
+						"description": "Looks up json config files to obtain job parameters.",
+						"type": "Lookup",
+						"dependsOn": [
+							{
+								"activity": "lookup_obtainJsonConfigFile",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.01:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "JsonSource",
+								"storeSettings": {
+									"type": "AzureBlobFSReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "JsonReadSettings"
+								}
+							},
+							"dataset": {
+								"referenceName": "ds_adlsJsonFile",
+								"type": "DatasetReference",
+								"parameters": {
+									"par_storageAccount": {
+										"value": "@concat(pipeline().globalParameters.par_metadataStorageAccountName,pipeline().globalParameters.par_environment)",
+										"type": "Expression"
+									},
+									"par_container": {
+										"value": "@pipeline().globalParameters.par_jobmetadataStorageAccountContainer",
+										"type": "Expression"
+									},
+									"par_directory": {
+										"value": "@toLower(pipeline().globalParameters.par_dataflowMappingStorageAccountDirectory)",
+										"type": "Expression"
+									},
+									"par_fileName": {
+										"value": "@if(and(contains(activity('lookup_obtainJsonConfigFile').output.firstRow,'mappingDefinitionFileName'),not(equals(trim(activity('lookup_obtainJsonConfigFile').output.firstRow.mappingDefinitionFileName),''))),activity('lookup_obtainJsonConfigFile').output.firstRow.mappingDefinitionFileName,pipeline().globalParameters.par_defaultMappingFileName)",
+										"type": "Expression"
+									},
+									"par_encoding": "Default(UTF-8)"
+								}
+							}
+						}
+					},
+					{
+						"name": "executePipeline_writeErrorLog2",
+						"description": "Pass error information to pl_writeLogToQueue and execute it.",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "lookup_obtainJsonMappingFile",
+								"dependencyConditions": [
+									"Failed"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "pl_writeLogToQueue",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": false,
+							"parameters": {
+								"par_logType": "Error",
+								"par_logId": {
+									"value": "@activity('lookup_obtainJsonMappingFile').Error.errorCode",
+									"type": "Expression"
+								},
+								"par_logMessage": {
+									"value": "@activity('lookup_obtainJsonMappingFile').Error.message",
+									"type": "Expression"
+								},
+								"par_jobName": {
+									"value": "@pipeline().Pipeline",
+									"type": "Expression"
+								},
+								"par_jobId": {
+									"value": "@pipeline().parameters.par_jobId",
+									"type": "Expression"
+								},
+								"par_jobRunId": {
+									"value": "@pipeline().RunId",
+									"type": "Expression"
+								},
+								"par_groupId": {
+									"value": "@pipeline().GroupId",
+									"type": "Expression"
+								},
+								"par_triggerId": {
+									"value": "@pipeline().TriggerId",
+									"type": "Expression"
+								},
+								"par_triggerName": {
+									"value": "@pipeline().TriggerName",
+									"type": "Expression"
+								},
+								"par_triggerTime": {
+									"value": "@pipeline().TriggerTime",
+									"type": "Expression"
+								},
+								"par_parentJobRunId": {
+									"value": "@pipeline()?.TriggeredByPipelineRunId",
+									"type": "Expression"
+								},
+								"par_impact": "3",
+								"par_urgency": "3",
+								"par_ticketTitle": "Reading JSON config file is not working.",
+								"par_ticketDescription": {
+									"value": "@concat('Reading of JSON mapping file from metadata storage account is not working. Please resolve issue as soon as possible. Error message: ',activity('lookup_obtainJsonMappingFile').Error.message)",
+									"type": "Expression"
+								},
+								"par_recipientLeanIxId": "null",
+								"par_businessSupportGroup": "null",
+								"par_technicalSupportGroup": "null"
+							}
+						}
+					},
+					{
+						"name": "executePipeline_moveSourceFileToFailedAdls",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "copy_csvAdlsToAdls",
+								"dependencyConditions": [
+									"Failed",
+									"Skipped"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "pl_copy_basicBinaryFileAdls",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": false,
+							"parameters": {
+								"par_jobId": {
+									"value": "@pipeline().parameters.par_jobId",
+									"type": "Expression"
+								},
+								"par_sourceStorageAccount": {
+									"value": "@concat(activity('lookup_obtainJsonConfigFile').output.firstRow.adlsSource.storageAccount,pipeline().globalParameters.par_environment)",
+									"type": "Expression"
+								},
+								"par_sourceContainer": {
+									"value": "@activity('lookup_obtainJsonConfigFile').output.firstRow.adlsSource.container",
+									"type": "Expression"
+								},
+								"par_sourceDirectory": {
+									"value": "@toLower(activity('lookup_obtainJsonConfigFile').output.firstRow.adlsSource.directory)",
+									"type": "Expression"
+								},
+								"par_sourceFilename": {
+									"value": "@pipeline().parameters.par_sourceFileName",
+									"type": "Expression"
+								},
+								"par_targetStorageAccount": {
+									"value": "@concat(activity('lookup_obtainJsonConfigFile').output.firstRow.adlsSource.storageAccount,pipeline().globalParameters.par_environment)",
+									"type": "Expression"
+								},
+								"par_targetContainer": {
+									"value": "@pipeline().globalParameters.par_failedContainerName",
+									"type": "Expression"
+								},
+								"par_targetDirectory": {
+									"value": "@toLower(activity('lookup_obtainJsonConfigFile').output.firstRow.adlsSource.directory)",
+									"type": "Expression"
+								},
+								"par_targetFileName": {
+									"value": "@concat(split(pipeline().parameters.par_sourceFileName,'.')[0],'_','failed','_',variables('var_nowTime'),'.',split(pipeline().parameters.par_sourceFileName,'.')[1])",
+									"type": "Expression"
+								},
+								"par_deleteFilesAfterCompletion": true,
+								"par_impact": "2",
+								"par_urgency": "2",
+								"par_ticketTitle": "Moving source file to failed container failed.",
+								"par_ticketDescription": "Moving the source file to the failed container after an error occured in the main activity failed.",
+								"par_recipientLeanIxId": "null",
+								"par_businessSupportGroup": {
+									"value": "@activity('lookup_obtainJsonConfigFile').output.firstRow.businessNotification",
+									"type": "Expression"
+								},
+								"par_technicalSupportGroup": {
+									"value": "@activity('lookup_obtainJsonConfigFile').output.firstRow.technicalNotification",
+									"type": "Expression"
+								}
+							}
+						}
+					},
+					{
+						"name": "executePipeline_moveTargetFileToFailedAdls",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "if_targetSchemaFileNameSpecified",
+								"dependencyConditions": [
+									"Failed"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "pl_copy_basicBinaryFileAdls",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": false,
+							"parameters": {
+								"par_jobId": {
+									"value": "@pipeline().parameters.par_jobId",
+									"type": "Expression"
+								},
+								"par_sourceStorageAccount": {
+									"value": "@concat(activity('lookup_obtainJsonConfigFile').output.firstRow.adlsTarget.storageAccount,pipeline().globalParameters.par_environment)",
+									"type": "Expression"
+								},
+								"par_sourceContainer": {
+									"value": "@activity('lookup_obtainJsonConfigFile').output.firstRow.adlsTarget.container",
+									"type": "Expression"
+								},
+								"par_sourceDirectory": {
+									"value": "@toLower(activity('lookup_obtainJsonConfigFile').output.firstRow.adlsTarget.directory)",
+									"type": "Expression"
+								},
+								"par_sourceFilename": {
+									"value": "@variables('var_targetFilename')",
+									"type": "Expression"
+								},
+								"par_targetStorageAccount": {
+									"value": "@concat(activity('lookup_obtainJsonConfigFile').output.firstRow.adlsTarget.storageAccount,pipeline().globalParameters.par_environment)",
+									"type": "Expression"
+								},
+								"par_targetContainer": {
+									"value": "@pipeline().globalParameters.par_failedContainerName",
+									"type": "Expression"
+								},
+								"par_targetDirectory": {
+									"value": "@toLower(activity('lookup_obtainJsonConfigFile').output.firstRow.adlsTarget.directory)",
+									"type": "Expression"
+								},
+								"par_targetFileName": {
+									"value": "@concat(split(variables('var_targetFilename'),'.')[0],'_','failed','_',variables('var_nowTime'),'.',split(variables('var_targetFilename'),'.')[1])",
+									"type": "Expression"
+								},
+								"par_deleteFilesAfterCompletion": true,
+								"par_impact": "2",
+								"par_urgency": "2",
+								"par_ticketTitle": "Moving target file to failed container failed.",
+								"par_ticketDescription": "Moving the target file to the failed container after an error occured during the schema validation failed.",
+								"par_recipientLeanIxId": "null",
+								"par_businessSupportGroup": {
+									"value": "@activity('lookup_obtainJsonConfigFile').output.firstRow.businessNotification",
+									"type": "Expression"
+								},
+								"par_technicalSupportGroup": {
+									"value": "@activity('lookup_obtainJsonConfigFile').output.firstRow.technicalNotification",
+									"type": "Expression"
+								}
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {},
+					"cancelAfter": {}
+				},
+				"parameters": {
+					"par_jobId": {
+						"type": "string"
+					},
+					"par_sourceFileName": {
+						"type": "string"
+					}
+				},
+				"variables": {
+					"var_nowTime": {
+						"type": "String"
+					},
+					"var_targetFilename": {
+						"type": "String"
+					}
+				},
+				"folder": {
+					"name": "AMIS/2_Processing/CSV copy"
+				},
+				"annotations": [],
+				"lastPublishTime": "2022-04-13T10:07:16Z"
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/ds_adlsCsvFile')]",
+				"[concat(variables('factoryId'), '/pipelines/pl_writeLogToQueue')]",
+				"[concat(variables('factoryId'), '/datasets/ds_adlsJsonFile')]",
+				"[concat(variables('factoryId'), '/pipelines/pl_copy_basicBinaryFileAdls')]",
+				"[concat(variables('factoryId'), '/pipelines/pl_validateFileSchema')]",
+				"[concat(variables('factoryId'), '/pipelines/pl_delete_basicBinaryFileAdls')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/pl_delete_basicBinaryFile')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "executePipeline_writeErrorLog",
+						"description": "Pass error information to pl_writeLogToQueue and execute it.",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "delete_binaryFileAdls",
+								"dependencyConditions": [
+									"Failed"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "pl_writeLogToQueue",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": false,
+							"parameters": {
+								"par_logType": "Error",
+								"par_logId": {
+									"value": "@activity('delete_binaryFileAdls').Error.errorCode",
+									"type": "Expression"
+								},
+								"par_logMessage": {
+									"value": "@activity('delete_binaryFileAdls').Error.message",
+									"type": "Expression"
+								},
+								"par_jobName": {
+									"value": "@pipeline().Pipeline",
+									"type": "Expression"
+								},
+								"par_jobId": "Übung 0",
+								"par_jobRunId": {
+									"value": "@pipeline().RunId",
+									"type": "Expression"
+								},
+								"par_parentJobRunId": {
+									"value": "@pipeline()?.TriggeredByPipelineRunId",
+									"type": "Expression"
+								}
+							}
+						}
+					},
+					{
+						"name": "delete_binaryFileAdls",
+						"type": "Delete",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.01:00:00",
+							"retry": 1,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"dataset": {
+								"referenceName": "ds_adlsBinaryFile",
+								"type": "DatasetReference",
+								"parameters": {
+									"par_storageAccount": "workshopinbounddevl",
+									"par_container": "landing",
+									"par_directory": "deleteme",
+									"par_filename": {
+										"value": "@pipeline().parameters.par_filename",
+										"type": "Expression"
+									}
+								}
+							},
+							"enableLogging": false,
+							"storeSettings": {
+								"type": "AzureBlobFSReadSettings",
+								"recursive": true,
+								"enablePartitionDiscovery": false
+							}
+						}
+					},
+					{
+						"name": "executePipeline_writeSuccessLog",
+						"description": "Pass error information to pl_writeLogToQueue and execute it.",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "delete_binaryFileAdls",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "pl_writeLogToQueue",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": false,
+							"parameters": {
+								"par_logType": "Success",
+								"par_logId": "FILE DELETED",
+								"par_logMessage": {
+									"value": "@concat(pipeline().parameters.par_filename, ' was deleted!')",
+									"type": "Expression"
+								},
+								"par_jobName": {
+									"value": "@pipeline().Pipeline",
+									"type": "Expression"
+								},
+								"par_jobId": "Übung 0",
+								"par_jobRunId": {
+									"value": "@pipeline().RunId",
+									"type": "Expression"
+								},
+								"par_parentJobRunId": {
+									"value": "@pipeline()?.TriggeredByPipelineRunId",
+									"type": "Expression"
+								}
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {},
+					"cancelAfter": {}
+				},
+				"parameters": {
+					"par_filename": {
+						"type": "string"
+					}
+				},
+				"folder": {
+					"name": "Übung1"
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/pipelines/pl_writeLogToQueue')]",
+				"[concat(variables('factoryId'), '/datasets/ds_adlsBinaryFile')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/pl_delete_basicBinaryFileAdls')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "executePipeline_writeErrorLog",
+						"description": "Pass error information to pl_writeLogToQueue and execute it.",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "delete_binaryFileAdls",
+								"dependencyConditions": [
+									"Failed"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "pl_writeLogToQueue",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": false,
+							"parameters": {
+								"par_logType": "Error",
+								"par_logId": {
+									"value": "@activity('delete_binaryFileAdls').Error.errorCode",
+									"type": "Expression"
+								},
+								"par_logMessage": {
+									"value": "@activity('delete_binaryFileAdls').Error.message",
+									"type": "Expression"
+								},
+								"par_jobName": {
+									"value": "@pipeline().Pipeline",
+									"type": "Expression"
+								},
+								"par_jobId": {
+									"value": "@pipeline().parameters.par_jobId",
+									"type": "Expression"
+								},
+								"par_jobRunId": {
+									"value": "@pipeline().RunId",
+									"type": "Expression"
+								},
+								"par_parentJobRunId": {
+									"value": "@pipeline()?.TriggeredByPipelineRunId",
+									"type": "Expression"
+								}
+							}
+						}
+					},
+					{
+						"name": "delete_binaryFileAdls",
+						"type": "Delete",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.01:00:00",
+							"retry": 1,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"dataset": {
+								"referenceName": "ds_adlsBinaryFile",
+								"type": "DatasetReference",
+								"parameters": {
+									"par_storageAccount": {
+										"value": "@pipeline().parameters.par_storageAccount",
+										"type": "Expression"
+									},
+									"par_container": {
+										"value": "@pipeline().parameters.par_container",
+										"type": "Expression"
+									},
+									"par_directory": {
+										"value": "@pipeline().parameters.par_directory",
+										"type": "Expression"
+									},
+									"par_filename": {
+										"value": "@pipeline().parameters.par_filename",
+										"type": "Expression"
+									}
+								}
+							},
+							"enableLogging": false,
+							"storeSettings": {
+								"type": "AzureBlobFSReadSettings",
+								"recursive": true,
+								"enablePartitionDiscovery": false
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {},
+					"cancelAfter": {}
+				},
+				"parameters": {
+					"par_jobId": {
+						"type": "string"
+					},
+					"par_storageAccount": {
+						"type": "string"
+					},
+					"par_container": {
+						"type": "string"
+					},
+					"par_directory": {
+						"type": "string"
+					},
+					"par_filename": {
+						"type": "string"
+					}
+				},
+				"folder": {
+					"name": "AMIS/4_Shared/Deleting"
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/pipelines/pl_writeLogToQueue')]",
+				"[concat(variables('factoryId'), '/datasets/ds_adlsBinaryFile')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/pl_validateFileSchema')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Ths pipeline may be called to validate the soure file of a copy activity by comparing it to schema of a comparison file specified by the metadadta of the job.",
+				"activities": [
+					{
+						"name": "lookup_obtainJsonConfigFile",
+						"description": "Looks up json config files to obtain job parameters.",
+						"type": "Lookup",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.01:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "JsonSource",
+								"storeSettings": {
+									"type": "AzureBlobFSReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "JsonReadSettings"
+								}
+							},
+							"dataset": {
+								"referenceName": "ds_adlsJsonFile",
+								"type": "DatasetReference",
+								"parameters": {
+									"par_storageAccount": {
+										"value": "@concat(pipeline().globalParameters.par_metadataStorageAccountName,pipeline().globalParameters.par_environment)",
+										"type": "Expression"
+									},
+									"par_container": {
+										"value": "@pipeline().globalParameters.par_jobmetadataStorageAccountContainer",
+										"type": "Expression"
+									},
+									"par_directory": {
+										"value": "@toLower(pipeline().globalParameters.par_dataflowConfigStorageAccountDirectory)",
+										"type": "Expression"
+									},
+									"par_fileName": {
+										"value": "@concat(pipeline().parameters.par_jobId,'.json')",
+										"type": "Expression"
+									},
+									"par_encoding": "Default(UTF-8)"
+								}
+							}
+						}
+					},
+					{
+						"name": "executePipeline_writeErrorLog1",
+						"description": "Pass error information to pl_writeLogToQueue and execute it.",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "lookup_obtainJsonConfigFile",
+								"dependencyConditions": [
+									"Failed"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "pl_writeLogToQueue",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": false,
+							"parameters": {
+								"par_logType": "Error",
+								"par_logId": {
+									"value": "@activity('lookup_obtainJsonConfigFile').Error.errorCode",
+									"type": "Expression"
+								},
+								"par_logMessage": {
+									"value": "@activity('lookup_obtainJsonConfigFile').Error.message",
+									"type": "Expression"
+								},
+								"par_jobName": {
+									"value": "@pipeline().Pipeline",
+									"type": "Expression"
+								},
+								"par_jobId": {
+									"value": "@pipeline().parameters.par_jobId",
+									"type": "Expression"
+								},
+								"par_jobRunId": {
+									"value": "@pipeline().RunId",
+									"type": "Expression"
+								},
+								"par_parentJobRunId": {
+									"value": "@pipeline()?.TriggeredByPipelineRunId",
+									"type": "Expression"
+								},
+								"par_kürzel": {
+									"value": "@pipeline().globalParameters.par_kürzel",
+									"type": "Expression"
+								}
+							}
+						}
+					},
+					{
+						"name": "switch_uponFileType",
+						"type": "Switch",
+						"dependsOn": [
+							{
+								"activity": "setVar_fileType",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"on": {
+								"value": "@variables('var_fileType')",
+								"type": "Expression"
+							},
+							"cases": [
+								{
+									"value": "csv or txt",
+									"activities": [
+										{
+											"name": "getMetadata_ofCsvFileToValidate",
+											"type": "GetMetadata",
+											"dependsOn": [],
+											"policy": {
+												"timeout": "0.01:00:00",
+												"retry": 3,
+												"retryIntervalInSeconds": 30,
+												"secureOutput": false,
+												"secureInput": false
+											},
+											"userProperties": [],
+											"typeProperties": {
+												"dataset": {
+													"referenceName": "ds_adlsCsvFile",
+													"type": "DatasetReference",
+													"parameters": {
+														"par_storageAccount": {
+															"value": "@concat(if(pipeline().parameters.par_isSourceFile,activity('lookup_obtainJsonConfigFile').output.firstRow.adlsSource.storageAccount,activity('lookup_obtainJsonConfigFile').output.firstRow.adlsTarget.storageAccount),pipeline().globalParameters.par_environment)",
+															"type": "Expression"
+														},
+														"par_container": {
+															"value": "@if(pipeline().parameters.par_isSourceFile,activity('lookup_obtainJsonConfigFile').output.firstRow.adlsSource.container,activity('lookup_obtainJsonConfigFile').output.firstRow.adlsTarget.container)",
+															"type": "Expression"
+														},
+														"par_directory": {
+															"value": "@toLower(if(pipeline().parameters.par_isSourceFile,activity('lookup_obtainJsonConfigFile').output.firstRow.adlsSource.directory,activity('lookup_obtainJsonConfigFile').output.firstRow.adlsTarget.directory))",
+															"type": "Expression"
+														},
+														"par_filename": {
+															"value": "@pipeline().parameters.par_filename",
+															"type": "Expression"
+														},
+														"par_columnDelimiter": {
+															"value": "@if(pipeline().parameters.par_isSourceFile,activity('lookup_obtainJsonConfigFile').output.firstRow.csvSource.columnDelimiter,activity('lookup_obtainJsonConfigFile').output.firstRow.csvTarget.columnDelimiter)",
+															"type": "Expression"
+														},
+														"par_encoding": {
+															"value": "@if(pipeline().parameters.par_isSourceFile,activity('lookup_obtainJsonConfigFile').output.firstRow.csvSource.encoding,activity('lookup_obtainJsonConfigFile').output.firstRow.csvTarget.encoding)",
+															"type": "Expression"
+														},
+														"par_escapeCharacter": {
+															"value": "@if(pipeline().parameters.par_isSourceFile,activity('lookup_obtainJsonConfigFile').output.firstRow.csvSource.escapeCharacter,activity('lookup_obtainJsonConfigFile').output.firstRow.csvTarget.escapeCharacter)",
+															"type": "Expression"
+														},
+														"par_quoteCharacter": {
+															"value": "@if(pipeline().parameters.par_isSourceFile,activity('lookup_obtainJsonConfigFile').output.firstRow.csvSource.quoteCharacter,activity('lookup_obtainJsonConfigFile').output.firstRow.csvTarget.quoteCharacter)",
+															"type": "Expression"
+														},
+														"par_firstRowAsHeader": {
+															"value": "@if(pipeline().parameters.par_isSourceFile,activity('lookup_obtainJsonConfigFile').output.firstRow.csvSource.firstRowAsHeader,activity('lookup_obtainJsonConfigFile').output.firstRow.csvTarget.firstRowAsHeader)",
+															"type": "Expression"
+														},
+														"par_compressionType": {
+															"value": "@if(pipeline().parameters.par_isSourceFile,activity('lookup_obtainJsonConfigFile').output.firstRow.csvSource.compressionType,activity('lookup_obtainJsonConfigFile').output.firstRow.csvTarget.compressionType)",
+															"type": "Expression"
+														},
+														"par_compressionLevel": {
+															"value": "@if(pipeline().parameters.par_isSourceFile,activity('lookup_obtainJsonConfigFile').output.firstRow.csvSource.compressionLevel,activity('lookup_obtainJsonConfigFile').output.firstRow.csvTarget.compressionLevel)",
+															"type": "Expression"
+														},
+														"par_nullValue": {
+															"value": "@if(pipeline().parameters.par_isSourceFile,if(contains(activity('lookup_obtainJsonConfigFile').output.firstRow.csvSource,'nullValue'),activity('lookup_obtainJsonConfigFile').output.firstRow.csvSource.nullValue, ''),if(contains(activity('lookup_obtainJsonConfigFile').output.firstRow.csvTarget,'nullValue'),activity('lookup_obtainJsonConfigFile').output.firstRow.csvTarget.nullValue, ''))",
+															"type": "Expression"
+														},
+														"par_rowDelimiter": {
+															"value": "@if(pipeline().parameters.par_isSourceFile,activity('lookup_obtainJsonConfigFile').output.firstRow.csvSource.rowDelimiter,activity('lookup_obtainJsonConfigFile').output.firstRow.csvTarget.rowDelimiter)",
+															"type": "Expression"
+														}
+													}
+												},
+												"fieldList": [
+													"structure",
+													"columnCount"
+												],
+												"storeSettings": {
+													"type": "AzureBlobFSReadSettings",
+													"recursive": true,
+													"enablePartitionDiscovery": false
+												},
+												"formatSettings": {
+													"type": "DelimitedTextReadSettings"
+												}
+											}
+										},
+										{
+											"name": "getMetadata_ofCsvSchemaFile",
+											"type": "GetMetadata",
+											"dependsOn": [],
+											"policy": {
+												"timeout": "0.01:00:00",
+												"retry": 3,
+												"retryIntervalInSeconds": 30,
+												"secureOutput": false,
+												"secureInput": false
+											},
+											"userProperties": [],
+											"typeProperties": {
+												"dataset": {
+													"referenceName": "ds_adlsCsvFile_defaultRowDelimiter",
+													"type": "DatasetReference",
+													"parameters": {
+														"par_storageAccount": {
+															"value": "@concat(pipeline().globalParameters.par_metadataStorageAccountName,pipeline().globalParameters.par_environment)",
+															"type": "Expression"
+														},
+														"par_container": {
+															"value": "@pipeline().globalParameters.par_jobmetadataStorageAccountContainer",
+															"type": "Expression"
+														},
+														"par_directory": {
+															"value": "@toLower(pipeline().globalParameters.par_schemaFileStorageAccountDirectory)",
+															"type": "Expression"
+														},
+														"par_filename": {
+															"value": "@activity('lookup_obtainJsonConfigFile').output.firstRow.sourceSchemaFileName",
+															"type": "Expression"
+														},
+														"par_columnDelimiter": {
+															"value": "@if(pipeline().parameters.par_isSourceFile,activity('lookup_obtainJsonConfigFile').output.firstRow.csvSource.columnDelimiter,activity('lookup_obtainJsonConfigFile').output.firstRow.csvTarget.columnDelimiter)",
+															"type": "Expression"
+														},
+														"par_encoding": {
+															"value": "@if(pipeline().parameters.par_isSourceFile,activity('lookup_obtainJsonConfigFile').output.firstRow.csvSource.encoding,activity('lookup_obtainJsonConfigFile').output.firstRow.csvTarget.encoding)",
+															"type": "Expression"
+														},
+														"par_escapeCharacter": {
+															"value": "@if(pipeline().parameters.par_isSourceFile,activity('lookup_obtainJsonConfigFile').output.firstRow.csvSource.escapeCharacter,activity('lookup_obtainJsonConfigFile').output.firstRow.csvTarget.escapeCharacter)",
+															"type": "Expression"
+														},
+														"par_quoteCharacter": {
+															"value": "@if(pipeline().parameters.par_isSourceFile,activity('lookup_obtainJsonConfigFile').output.firstRow.csvSource.quoteCharacter,activity('lookup_obtainJsonConfigFile').output.firstRow.csvTarget.quoteCharacter)",
+															"type": "Expression"
+														},
+														"par_firstRowAsHeader": {
+															"value": "@if(pipeline().parameters.par_isSourceFile,activity('lookup_obtainJsonConfigFile').output.firstRow.csvSource.firstRowAsHeader,activity('lookup_obtainJsonConfigFile').output.firstRow.csvTarget.firstRowAsHeader)",
+															"type": "Expression"
+														},
+														"par_compressionType": {
+															"value": "@if(pipeline().parameters.par_isSourceFile,activity('lookup_obtainJsonConfigFile').output.firstRow.csvSource.compressionType,activity('lookup_obtainJsonConfigFile').output.firstRow.csvTarget.compressionType)",
+															"type": "Expression"
+														},
+														"par_compressionLevel": {
+															"value": "@if(pipeline().parameters.par_isSourceFile,activity('lookup_obtainJsonConfigFile').output.firstRow.csvSource.compressionLevel,activity('lookup_obtainJsonConfigFile').output.firstRow.csvTarget.compressionLevel)",
+															"type": "Expression"
+														},
+														"par_nullValue": {
+															"value": "@if(pipeline().parameters.par_isSourceFile,if(contains(activity('lookup_obtainJsonConfigFile').output.firstRow.csvSource,'nullValue'),activity('lookup_obtainJsonConfigFile').output.firstRow.csvSource.nullValue, ''),if(contains(activity('lookup_obtainJsonConfigFile').output.firstRow.csvTarget,'nullValue'),activity('lookup_obtainJsonConfigFile').output.firstRow.csvTarget.nullValue, ''))",
+															"type": "Expression"
+														}
+													}
+												},
+												"fieldList": [
+													"structure",
+													"columnCount"
+												],
+												"storeSettings": {
+													"type": "AzureBlobFSReadSettings",
+													"recursive": true,
+													"enablePartitionDiscovery": false
+												},
+												"formatSettings": {
+													"type": "DelimitedTextReadSettings"
+												}
+											}
+										},
+										{
+											"name": "executePipeline_writeErrorLog3",
+											"description": "Pass error information to pl_writeLogToQueue and execute it.",
+											"type": "ExecutePipeline",
+											"dependsOn": [
+												{
+													"activity": "getMetadata_ofCsvSchemaFile",
+													"dependencyConditions": [
+														"Failed"
+													]
+												}
+											],
+											"userProperties": [],
+											"typeProperties": {
+												"pipeline": {
+													"referenceName": "pl_writeLogToQueue",
+													"type": "PipelineReference"
+												},
+												"waitOnCompletion": false,
+												"parameters": {
+													"par_logType": "Error",
+													"par_logId": {
+														"value": "@activity('getMetadata_ofCsvSchemaFile').Error.errorCode",
+														"type": "Expression"
+													},
+													"par_logMessage": {
+														"value": "@activity('getMetadata_ofCsvSchemaFile').Error.message",
+														"type": "Expression"
+													},
+													"par_jobName": {
+														"value": "@pipeline().Pipeline",
+														"type": "Expression"
+													},
+													"par_jobId": {
+														"value": "@pipeline().parameters.par_jobId",
+														"type": "Expression"
+													},
+													"par_jobRunId": {
+														"value": "@pipeline().RunId",
+														"type": "Expression"
+													},
+													"par_parentJobRunId": {
+														"value": "@pipeline()?.TriggeredByPipelineRunId",
+														"type": "Expression"
+													}
+												}
+											}
+										},
+										{
+											"name": "executePipeline_writeErrorLog2",
+											"description": "Pass error information to pl_writeLogToQueue and execute it.",
+											"type": "ExecutePipeline",
+											"dependsOn": [
+												{
+													"activity": "getMetadata_ofCsvFileToValidate",
+													"dependencyConditions": [
+														"Failed"
+													]
+												}
+											],
+											"userProperties": [],
+											"typeProperties": {
+												"pipeline": {
+													"referenceName": "pl_writeLogToQueue",
+													"type": "PipelineReference"
+												},
+												"waitOnCompletion": false,
+												"parameters": {
+													"par_logType": "Error",
+													"par_logId": {
+														"value": "@activity('getMetadata_ofCsvFileToValidate').Error.errorCode",
+														"type": "Expression"
+													},
+													"par_logMessage": {
+														"value": "@activity('getMetadata_ofCsvFileToValidate').Error.message",
+														"type": "Expression"
+													},
+													"par_jobName": {
+														"value": "@pipeline().Pipeline",
+														"type": "Expression"
+													},
+													"par_jobId": {
+														"value": "@pipeline().parameters.par_jobId",
+														"type": "Expression"
+													},
+													"par_jobRunId": {
+														"value": "@pipeline().RunId",
+														"type": "Expression"
+													},
+													"par_parentJobRunId": {
+														"value": "@pipeline()?.TriggeredByPipelineRunId",
+														"type": "Expression"
+													}
+												}
+											}
+										},
+										{
+											"name": "set_isSchemaValid_csv",
+											"type": "SetVariable",
+											"dependsOn": [
+												{
+													"activity": "getMetadata_ofCsvFileToValidate",
+													"dependencyConditions": [
+														"Succeeded"
+													]
+												},
+												{
+													"activity": "getMetadata_ofCsvSchemaFile",
+													"dependencyConditions": [
+														"Succeeded"
+													]
+												}
+											],
+											"userProperties": [],
+											"typeProperties": {
+												"variableName": "var_isSchemaValid",
+												"value": {
+													"value": "@equals(activity('getMetadata_ofCsvFileToValidate').output.structure,activity('getMetadata_ofCsvSchemaFile').output.structure)",
+													"type": "Expression"
+												}
+											}
+										}
+									]
+								},
+								{
+									"value": "parquet",
+									"activities": [
+										{
+											"name": "getMetadata_ofParquetFileToValidate",
+											"type": "GetMetadata",
+											"dependsOn": [],
+											"policy": {
+												"timeout": "0.01:00:00",
+												"retry": 3,
+												"retryIntervalInSeconds": 30,
+												"secureOutput": false,
+												"secureInput": false
+											},
+											"userProperties": [],
+											"typeProperties": {
+												"dataset": {
+													"referenceName": "ds_adlsParquetFile",
+													"type": "DatasetReference",
+													"parameters": {
+														"par_storageAccount": {
+															"value": "@concat(if(pipeline().parameters.par_isSourceFile,activity('lookup_obtainJsonConfigFile').output.firstRow.adlsSource.storageAccount,activity('lookup_obtainJsonConfigFile').output.firstRow.adlsTarget.storageAccount),pipeline().globalParameters.par_environment)",
+															"type": "Expression"
+														},
+														"par_container": {
+															"value": "@if(pipeline().parameters.par_isSourceFile,activity('lookup_obtainJsonConfigFile').output.firstRow.adlsSource.container,activity('lookup_obtainJsonConfigFile').output.firstRow.adlsTarget.container)",
+															"type": "Expression"
+														},
+														"par_directory": {
+															"value": "@toLower(if(pipeline().parameters.par_isSourceFile,activity('lookup_obtainJsonConfigFile').output.firstRow.adlsSource.directory,activity('lookup_obtainJsonConfigFile').output.firstRow.adlsTarget.directory))",
+															"type": "Expression"
+														},
+														"par_filename": {
+															"value": "@pipeline().parameters.par_filename",
+															"type": "Expression"
+														}
+													}
+												},
+												"fieldList": [
+													"structure",
+													"columnCount"
+												],
+												"storeSettings": {
+													"type": "AzureBlobFSReadSettings",
+													"recursive": true,
+													"enablePartitionDiscovery": false
+												}
+											}
+										},
+										{
+											"name": "getMetadata_ofParquetSchemaFile",
+											"type": "GetMetadata",
+											"dependsOn": [],
+											"policy": {
+												"timeout": "0.01:00:00",
+												"retry": 3,
+												"retryIntervalInSeconds": 30,
+												"secureOutput": false,
+												"secureInput": false
+											},
+											"userProperties": [],
+											"typeProperties": {
+												"dataset": {
+													"referenceName": "ds_adlsParquetFile",
+													"type": "DatasetReference",
+													"parameters": {
+														"par_storageAccount": {
+															"value": "@concat(pipeline().globalParameters.par_metadataStorageAccountName,pipeline().globalParameters.par_environment)",
+															"type": "Expression"
+														},
+														"par_container": {
+															"value": "@pipeline().globalParameters.par_jobmetadataStorageAccountContainer",
+															"type": "Expression"
+														},
+														"par_directory": {
+															"value": "@toLower(pipeline().globalParameters.par_schemaFileStorageAccountDirectory)",
+															"type": "Expression"
+														},
+														"par_filename": {
+															"value": "@activity('lookup_obtainJsonConfigFile').output.firstRow.sourceSchemaFileName",
+															"type": "Expression"
+														}
+													}
+												},
+												"fieldList": [
+													"structure",
+													"columnCount"
+												],
+												"storeSettings": {
+													"type": "AzureBlobFSReadSettings",
+													"recursive": true,
+													"enablePartitionDiscovery": false
+												}
+											}
+										},
+										{
+											"name": "executePipeline_writeErrorLog5",
+											"description": "Pass error information to pl_writeLogToQueue and execute it.",
+											"type": "ExecutePipeline",
+											"dependsOn": [
+												{
+													"activity": "getMetadata_ofParquetSchemaFile",
+													"dependencyConditions": [
+														"Failed"
+													]
+												}
+											],
+											"userProperties": [],
+											"typeProperties": {
+												"pipeline": {
+													"referenceName": "pl_writeLogToQueue",
+													"type": "PipelineReference"
+												},
+												"waitOnCompletion": false,
+												"parameters": {
+													"par_logType": "Error",
+													"par_logId": {
+														"value": "@activity('getMetadata_ofParquetSchemaFile').Error.errorCode",
+														"type": "Expression"
+													},
+													"par_logMessage": {
+														"value": "@activity('getMetadata_ofParquetSchemaFile').Error.message",
+														"type": "Expression"
+													},
+													"par_jobName": {
+														"value": "@pipeline().Pipeline",
+														"type": "Expression"
+													},
+													"par_jobId": {
+														"value": "@pipeline().parameters.par_jobId",
+														"type": "Expression"
+													},
+													"par_jobRunId": {
+														"value": "@pipeline().RunId",
+														"type": "Expression"
+													},
+													"par_parentJobRunId": {
+														"value": "@pipeline()?.TriggeredByPipelineRunId",
+														"type": "Expression"
+													}
+												}
+											}
+										},
+										{
+											"name": "executePipeline_writeErrorLog4",
+											"description": "Pass error information to pl_writeLogToQueue and execute it.",
+											"type": "ExecutePipeline",
+											"dependsOn": [
+												{
+													"activity": "getMetadata_ofParquetFileToValidate",
+													"dependencyConditions": [
+														"Failed"
+													]
+												}
+											],
+											"userProperties": [],
+											"typeProperties": {
+												"pipeline": {
+													"referenceName": "pl_writeLogToQueue",
+													"type": "PipelineReference"
+												},
+												"waitOnCompletion": false,
+												"parameters": {
+													"par_logType": "Error",
+													"par_logId": {
+														"value": "@activity('getMetadata_ofParquetFileToValidate').Error.errorCode",
+														"type": "Expression"
+													},
+													"par_logMessage": {
+														"value": "@activity('getMetadata_ofParquetFileToValidate').Error.message",
+														"type": "Expression"
+													},
+													"par_jobName": {
+														"value": "@pipeline().Pipeline",
+														"type": "Expression"
+													},
+													"par_jobId": {
+														"value": "@pipeline().parameters.par_jobId",
+														"type": "Expression"
+													},
+													"par_jobRunId": {
+														"value": "@pipeline().RunId",
+														"type": "Expression"
+													},
+													"par_parentJobRunId": {
+														"value": "@pipeline()?.TriggeredByPipelineRunId",
+														"type": "Expression"
+													}
+												}
+											}
+										},
+										{
+											"name": "set_isSchemaValid_parquet",
+											"type": "SetVariable",
+											"dependsOn": [
+												{
+													"activity": "getMetadata_ofParquetSchemaFile",
+													"dependencyConditions": [
+														"Succeeded"
+													]
+												},
+												{
+													"activity": "getMetadata_ofParquetFileToValidate",
+													"dependencyConditions": [
+														"Succeeded"
+													]
+												}
+											],
+											"userProperties": [],
+											"typeProperties": {
+												"variableName": "var_isSchemaValid",
+												"value": {
+													"value": "@equals(activity('getMetadata_ofParquetFileToValidate').output.structure,activity('getMetadata_ofParquetSchemaFile').output.structure)",
+													"type": "Expression"
+												}
+											}
+										}
+									]
+								}
+							],
+							"defaultActivities": [
+								{
+									"name": "fail_unsupportedFileType",
+									"type": "Fail",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"message": "The file schema could not be validated, since the file tpe is not supported",
+										"errorCode": "UNSUPPORTED FILE TYPE"
+									}
+								}
+							]
+						}
+					},
+					{
+						"name": "if_schemaIsValid",
+						"type": "IfCondition",
+						"dependsOn": [
+							{
+								"activity": "switch_uponFileType",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"expression": {
+								"value": "@variables('var_isSchemaValid')",
+								"type": "Expression"
+							},
+							"ifFalseActivities": [
+								{
+									"name": "fail_schemaStructureNotIdentical",
+									"type": "Fail",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"message": {
+											"value": "@concat('The csv schema of the file ', pipeline().parameters.par_filename, ' is not valid when compared to the reference file ', activity('lookup_obtainJsonConfigFile').output.firstRow.sourceSchemaFileName, '.')",
+											"type": "Expression"
+										},
+										"errorCode": "CSV_SCHEMA_INVALID"
+									}
+								}
+							]
+						}
+					},
+					{
+						"name": "setVar_fileType",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "lookup_obtainJsonConfigFile",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "var_fileType",
+							"value": {
+								"value": "@if(contains(activity('lookup_obtainJsonConfigFile').output.firstRow,'fileType'),if(or(equals(replace(activity('lookup_obtainJsonConfigFile').output.firstRow.fileType,'.',''),'csv'),equals(replace(activity('lookup_obtainJsonConfigFile').output.firstRow.fileType,'.',''),'txt')),'csv or txt',replace(activity('lookup_obtainJsonConfigFile').output.firstRow.fileType,'.','')),'')",
+								"type": "Expression"
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {},
+					"cancelAfter": {}
+				},
+				"parameters": {
+					"par_filename": {
+						"type": "string",
+						"defaultValue": "snbgc_20220811_191405.csv"
+					},
+					"par_jobId": {
+						"type": "string",
+						"defaultValue": "http-1_PRC"
+					},
+					"par_isSourceFile": {
+						"type": "bool",
+						"defaultValue": true
+					}
+				},
+				"variables": {
+					"var_isSchemaValid": {
+						"type": "Boolean",
+						"defaultValue": false
+					},
+					"var_fileType": {
+						"type": "String"
+					}
+				},
+				"folder": {
+					"name": "AMIS/4_Shared/Schema Validation"
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/ds_adlsJsonFile')]",
+				"[concat(variables('factoryId'), '/pipelines/pl_writeLogToQueue')]",
+				"[concat(variables('factoryId'), '/datasets/ds_adlsCsvFile')]",
+				"[concat(variables('factoryId'), '/datasets/ds_adlsCsvFile_defaultRowDelimiter')]",
+				"[concat(variables('factoryId'), '/datasets/ds_adlsParquetFile')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/pl_writeLogToQueue')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "web_getSasTokenFromAkv",
+						"type": "WebActivity",
+						"dependsOn": [
+							{
+								"activity": "setVar_messageText",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.01:00:00",
+							"retry": 3,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": true,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"url": {
+								"value": "@concat(pipeline().globalParameters.par_akvSasTokenUrlForWritingToQueue,'?api-version=7.0')",
+								"type": "Expression"
+							},
+							"method": "GET",
+							"headers": {},
+							"authentication": {
+								"type": "MSI",
+								"resource": "https://vault.azure.net"
+							}
+						}
+					},
+					{
+						"name": "web_writeToStorageQueue",
+						"type": "WebActivity",
+						"dependsOn": [
+							{
+								"activity": "web_getSasTokenFromAkv",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.01:00:00",
+							"retry": 3,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"url": {
+								"value": "@concat('https://', pipeline().globalParameters.par_metadataStorageAccountName, pipeline().globalParameters.par_environment, '.queue.core.windows.net/', pipeline().globalParameters.par_loggingStorageQueueName, '/messages?visibilitytimeout=30&timeout=30','&', activity('web_getSasTokenFromAkv').output.value)",
+								"type": "Expression"
+							},
+							"method": "POST",
+							"headers": {},
+							"body": {
+								"value": "@concat('<QueueMessage>  \n    <MessageText>',variables('var_messageText'),'</MessageText>  \n</QueueMessage>')",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "setVar_messageText",
+						"type": "SetVariable",
+						"dependsOn": [],
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "var_messageText",
+							"value": {
+								"value": "@concat('kürzel: ',pipeline().globalParameters.par_kürzel,'\r\nlogType: ', pipeline().parameters.par_logType,'\r\njobId: ', pipeline().parameters.par_jobId,'\r\nlogMessage: ', pipeline().parameters.par_logMessage,'\r\njobName: ', pipeline().parameters.par_jobName,'\r\njobId: ', pipeline().parameters.par_jobId,'\r\njobRunId: ', pipeline().parameters.par_jobRunId,'\r\nparentJobRunId: ', pipeline().parameters.par_parentJobRunId)",
+								"type": "Expression"
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {},
+					"cancelAfter": {}
+				},
+				"parameters": {
+					"par_logType": {
+						"type": "string"
+					},
+					"par_logId": {
+						"type": "string"
+					},
+					"par_logMessage": {
+						"type": "string"
+					},
+					"par_jobName": {
+						"type": "string"
+					},
+					"par_jobId": {
+						"type": "string"
+					},
+					"par_jobRunId": {
+						"type": "string"
+					},
+					"par_parentJobRunId": {
+						"type": "string"
+					}
+				},
+				"variables": {
+					"var_messageText": {
+						"type": "String"
+					}
+				},
+				"folder": {
+					"name": "AMIS/4_Shared/Logging and Alerting"
+				},
+				"annotations": []
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/ds_adlsBinaryFile')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "ls_adls",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"par_accountname": {
+							"value": "@dataset().par_storageAccount",
+							"type": "Expression"
+						}
+					}
+				},
+				"parameters": {
+					"par_storageAccount": {
+						"type": "string"
+					},
+					"par_container": {
+						"type": "string"
+					},
+					"par_directory": {
+						"type": "string"
+					},
+					"par_filename": {
+						"type": "string"
+					}
+				},
+				"folder": {
+					"name": "ADLS"
+				},
+				"annotations": [],
+				"type": "Binary",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobFSLocation",
+						"fileName": {
+							"value": "@dataset().par_filename",
+							"type": "Expression"
+						},
+						"folderPath": {
+							"value": "@dataset().par_directory",
+							"type": "Expression"
+						},
+						"fileSystem": {
+							"value": "@dataset().par_container",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/ls_adls')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/ds_adlsBinaryFolder')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "ls_adls",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"par_accountname": {
+							"value": "@dataset().par_storageAccount",
+							"type": "Expression"
+						}
+					}
+				},
+				"parameters": {
+					"par_storageAccount": {
+						"type": "string"
+					},
+					"par_container": {
+						"type": "string"
+					},
+					"par_directory": {
+						"type": "string"
+					}
+				},
+				"folder": {
+					"name": "ADLS"
+				},
+				"annotations": [],
+				"type": "Binary",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobFSLocation",
+						"folderPath": {
+							"value": "@dataset().par_directory",
+							"type": "Expression"
+						},
+						"fileSystem": {
+							"value": "@dataset().par_container",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/ls_adls')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/ds_adlsCsvFile')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "ls_adls",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"par_accountname": {
+							"value": "@dataset().par_storageAccount",
+							"type": "Expression"
+						}
+					}
+				},
+				"parameters": {
+					"par_storageAccount": {
+						"type": "string"
+					},
+					"par_container": {
+						"type": "string"
+					},
+					"par_directory": {
+						"type": "string"
+					},
+					"par_filename": {
+						"type": "string"
+					},
+					"par_columnDelimiter": {
+						"type": "string",
+						"defaultValue": ","
+					},
+					"par_encoding": {
+						"type": "string",
+						"defaultValue": "UTF-8"
+					},
+					"par_escapeCharacter": {
+						"type": "string",
+						"defaultValue": "\\"
+					},
+					"par_quoteCharacter": {
+						"type": "string",
+						"defaultValue": "\""
+					},
+					"par_firstRowAsHeader": {
+						"type": "bool",
+						"defaultValue": true
+					},
+					"par_compressionType": {
+						"type": "string",
+						"defaultValue": "None"
+					},
+					"par_compressionLevel": {
+						"type": "string",
+						"defaultValue": "Optimal"
+					},
+					"par_nullValue": {
+						"type": "string"
+					},
+					"par_rowDelimiter": {
+						"type": "string",
+						"defaultValue": "\\r\\n"
+					}
+				},
+				"folder": {
+					"name": "ADLS"
+				},
+				"annotations": [],
+				"type": "DelimitedText",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobFSLocation",
+						"fileName": {
+							"value": "@dataset().par_filename",
+							"type": "Expression"
+						},
+						"folderPath": {
+							"value": "@dataset().par_directory",
+							"type": "Expression"
+						},
+						"fileSystem": {
+							"value": "@dataset().par_container",
+							"type": "Expression"
+						}
+					},
+					"columnDelimiter": {
+						"value": "@dataset().par_columnDelimiter",
+						"type": "Expression"
+					},
+					"rowDelimiter": {
+						"value": "@dataset().par_rowDelimiter",
+						"type": "Expression"
+					},
+					"compressionCodec": {
+						"value": "@dataset().par_compressionType",
+						"type": "Expression"
+					},
+					"compressionLevel": {
+						"value": "@dataset().par_compressionLevel",
+						"type": "Expression"
+					},
+					"encodingName": {
+						"value": "@dataset().par_encoding",
+						"type": "Expression"
+					},
+					"escapeChar": {
+						"value": "@dataset().par_escapeCharacter",
+						"type": "Expression"
+					},
+					"firstRowAsHeader": {
+						"value": "@dataset().par_firstRowAsHeader",
+						"type": "Expression"
+					},
+					"nullValue": {
+						"value": "@dataset().par_nullValue",
+						"type": "Expression"
+					},
+					"quoteChar": {
+						"value": "@dataset().par_quoteCharacter",
+						"type": "Expression"
+					}
+				},
+				"schema": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/ls_adls')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/ds_adlsCsvFile_defaultRowDelimiter')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "ls_adls",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"par_accountname": {
+							"value": "@dataset().par_storageAccount",
+							"type": "Expression"
+						}
+					}
+				},
+				"parameters": {
+					"par_storageAccount": {
+						"type": "string"
+					},
+					"par_container": {
+						"type": "string"
+					},
+					"par_directory": {
+						"type": "string"
+					},
+					"par_filename": {
+						"type": "string"
+					},
+					"par_columnDelimiter": {
+						"type": "string",
+						"defaultValue": ","
+					},
+					"par_encoding": {
+						"type": "string",
+						"defaultValue": "UTF-8"
+					},
+					"par_escapeCharacter": {
+						"type": "string",
+						"defaultValue": "\\"
+					},
+					"par_quoteCharacter": {
+						"type": "string",
+						"defaultValue": "\""
+					},
+					"par_firstRowAsHeader": {
+						"type": "bool",
+						"defaultValue": true
+					},
+					"par_compressionType": {
+						"type": "string",
+						"defaultValue": "None"
+					},
+					"par_compressionLevel": {
+						"type": "string",
+						"defaultValue": "Optimal"
+					},
+					"par_nullValue": {
+						"type": "string"
+					}
+				},
+				"folder": {
+					"name": "ADLS"
+				},
+				"annotations": [],
+				"type": "DelimitedText",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobFSLocation",
+						"fileName": {
+							"value": "@dataset().par_filename",
+							"type": "Expression"
+						},
+						"folderPath": {
+							"value": "@dataset().par_directory",
+							"type": "Expression"
+						},
+						"fileSystem": {
+							"value": "@dataset().par_container",
+							"type": "Expression"
+						}
+					},
+					"columnDelimiter": {
+						"value": "@dataset().par_columnDelimiter",
+						"type": "Expression"
+					},
+					"compressionCodec": {
+						"value": "@dataset().par_compressionType",
+						"type": "Expression"
+					},
+					"compressionLevel": {
+						"value": "@dataset().par_compressionLevel",
+						"type": "Expression"
+					},
+					"encodingName": {
+						"value": "@dataset().par_encoding",
+						"type": "Expression"
+					},
+					"escapeChar": {
+						"value": "@dataset().par_escapeCharacter",
+						"type": "Expression"
+					},
+					"firstRowAsHeader": {
+						"value": "@dataset().par_firstRowAsHeader",
+						"type": "Expression"
+					},
+					"nullValue": {
+						"value": "@dataset().par_nullValue",
+						"type": "Expression"
+					},
+					"quoteChar": {
+						"value": "@dataset().par_quoteCharacter",
+						"type": "Expression"
+					}
+				},
+				"schema": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/ls_adls')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/ds_adlsJsonFile')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "ls_adls",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"par_accountname": {
+							"value": "@dataset().par_storageAccount",
+							"type": "Expression"
+						}
+					}
+				},
+				"parameters": {
+					"par_storageAccount": {
+						"type": "string"
+					},
+					"par_container": {
+						"type": "string"
+					},
+					"par_directory": {
+						"type": "string"
+					},
+					"par_fileName": {
+						"type": "string"
+					},
+					"par_encoding": {
+						"type": "string",
+						"defaultValue": "Default(UTF-8)"
+					}
+				},
+				"folder": {
+					"name": "ADLS"
+				},
+				"annotations": [],
+				"type": "Json",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobFSLocation",
+						"fileName": {
+							"value": "@dataset().par_fileName",
+							"type": "Expression"
+						},
+						"folderPath": {
+							"value": "@dataset().par_directory",
+							"type": "Expression"
+						},
+						"fileSystem": {
+							"value": "@dataset().par_container",
+							"type": "Expression"
+						}
+					}
+				},
+				"schema": {}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/ls_adls')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/ds_adlsParquetFile')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "ls_adls",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"par_accountname": {
+							"value": "@dataset().par_storageAccount",
+							"type": "Expression"
+						}
+					}
+				},
+				"parameters": {
+					"par_storageAccount": {
+						"type": "string"
+					},
+					"par_container": {
+						"type": "string"
+					},
+					"par_directory": {
+						"type": "string"
+					},
+					"par_filename": {
+						"type": "string"
+					}
+				},
+				"folder": {
+					"name": "ADLS"
+				},
+				"annotations": [],
+				"type": "Parquet",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobFSLocation",
+						"fileName": {
+							"value": "@dataset().par_filename",
+							"type": "Expression"
+						},
+						"folderPath": {
+							"value": "@dataset().par_directory",
+							"type": "Expression"
+						},
+						"fileSystem": {
+							"value": "@dataset().par_container",
+							"type": "Expression"
+						}
+					},
+					"compressionCodec": "snappy"
+				},
+				"schema": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/ls_adls')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/ds_httpBinaryFile_anonymous_noCompression')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "ls_http_anonymous",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"par_baseUrl": {
+							"value": "@dataset().par_baseUrl",
+							"type": "Expression"
+						}
+					}
+				},
+				"parameters": {
+					"par_baseUrl": {
+						"type": "string"
+					},
+					"par_relativeUrl": {
+						"type": "string"
+					}
+				},
+				"folder": {
+					"name": "HTTP"
+				},
+				"annotations": [],
+				"type": "Binary",
+				"typeProperties": {
+					"location": {
+						"type": "HttpServerLocation",
+						"relativeUrl": {
+							"value": "@dataset().par_relativeUrl",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/ls_http_anonymous')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/ls_adls')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Linked service for Azure Data Lake Storage Gen2 which takes the ADLS2 accountname as a parameter.",
+				"parameters": {
+					"par_accountname": {
+						"type": "string",
+						"defaultValue": "workshopmetadatadevl"
+					}
+				},
+				"annotations": [],
+				"type": "AzureBlobFS",
+				"typeProperties": {
+					"url": "[parameters('ls_adls_properties_typeProperties_url')]"
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/ls_adls_metadata')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"type": "AzureBlobFS",
+				"typeProperties": {
+					"url": "[parameters('ls_adls_metadata_properties_typeProperties_url')]",
+					"accountKey": {
+						"type": "SecureString",
+						"value": "[parameters('ls_adls_metadata_accountKey')]"
+					}
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/ls_akv')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"parameters": {
+					"par_azureKeyVaultName": {
+						"type": "string"
+					}
+				},
+				"annotations": [],
+				"type": "AzureKeyVault",
+				"typeProperties": {
+					"baseUrl": "[parameters('ls_akv_properties_typeProperties_baseUrl')]"
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/ls_http_anonymous')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "This HTTP linked service takes the base URL as parameter and uses anonymous as authentication type.",
+				"parameters": {
+					"par_baseUrl": {
+						"type": "string"
+					}
+				},
+				"annotations": [],
+				"type": "HttpServer",
+				"typeProperties": {
+					"url": "[parameters('ls_http_anonymous_properties_typeProperties_url')]",
+					"enableServerCertificateValidation": true,
+					"authenticationType": "Anonymous"
+				}
+			},
+			"dependsOn": []
+		}
+	]
+}

@@ -1,0 +1,30 @@
+{
+	"$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+	"contentVersion": "1.0.0.0",
+	"parameters": {
+		"factoryName": {
+			"value": "adf-workshop"
+		},
+		"ls_adls_metadata_accountKey": {
+			"value": ""
+		},
+		"ls_adls_properties_typeProperties_url": {
+			"value": "@{concat('https://',linkedService().par_accountname,'.dfs.core.windows.net')}"
+		},
+		"ls_adls_metadata_properties_typeProperties_url": {
+			"value": "https://workshopmetadatadevl.dfs.core.windows.net/"
+		},
+		"ls_akv_properties_typeProperties_baseUrl": {
+			"value": "@{concat('https://',linkedService().par_azureKeyVaultName,'.vault.azure.net')}"
+		},
+		"ls_http_anonymous_properties_typeProperties_url": {
+			"value": "@{linkedService().par_baseUrl}"
+		},
+		"containerUri": {
+			"value": ""
+		},
+		"containerSasToken": {
+			"value": ""
+		}
+	}
+}
