@@ -21,6 +21,10 @@
 			"par_jobmetadataStorageAccountContainer": {
 				"type": "string",
 				"value": "jobmetadata"
+			},
+			"par_dataflowConfigStorageAccountDirectory": {
+				"type": "string",
+				"value": "flowjobconfig"
 			}
 		}
 	},
