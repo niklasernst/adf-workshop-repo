@@ -40,13 +40,49 @@
 				"inputs": [
 					{
 						"referenceName": "ds_adlsBinaryFile",
-						"type": "DatasetReference"
+						"type": "DatasetReference",
+						"parameters": {
+							"par_storageAccount": {
+								"value": "@pipeline().parameters.par_sourceStorageAccount",
+								"type": "Expression"
+							},
+							"par_container": {
+								"value": "@pipeline().parameters.par_sourceContainer",
+								"type": "Expression"
+							},
+							"par_directory": {
+								"value": "@pipeline().parameters.par_sourceDirectory",
+								"type": "Expression"
+							},
+							"par_filename": {
+								"value": "@pipeline().parameters.par_sourceFileName",
+								"type": "Expression"
+							}
+						}
 					}
 				],
 				"outputs": [
 					{
 						"referenceName": "ds_adlsBinaryFile",
-						"type": "DatasetReference"
+						"type": "DatasetReference",
+						"parameters": {
+							"par_storageAccount": {
+								"value": "@pipeline().parameters.par_targetStorageAccount",
+								"type": "Expression"
+							},
+							"par_container": {
+								"value": "@pipeline().parameters.par_targetContainer",
+								"type": "Expression"
+							},
+							"par_directory": {
+								"value": "@pipeline().parameters.par_targetDirectory",
+								"type": "Expression"
+							},
+							"par_filename": {
+								"value": "@pipeline().parameters.par_targetFileName",
+								"type": "Expression"
+							}
+						}
 					}
 				]
 			},
