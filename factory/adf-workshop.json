@@ -53,6 +53,10 @@
 			"par_schemaFileStorageAccountDirectory": {
 				"type": "string",
 				"value": "flowjobschema"
+			},
+			"par_failedContainerName": {
+				"type": "string",
+				"value": "failed"
 			}
 		}
 	},
