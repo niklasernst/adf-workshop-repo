@@ -1,5 +1,5 @@
 {
-	"name": "pl_lookUpConfigAndExecuteTask1_erni_copy1",
+	"name": "pl_lookUpConfigAndExecuteTask1_erni",
 	"properties": {
 		"activities": [
 			{
@@ -150,7 +150,7 @@
 				"userProperties": [],
 				"typeProperties": {
 					"pipeline": {
-						"referenceName": "pl_copy_basicBinaryFile_erni_copy1",
+						"referenceName": "pl_copy_basicBinaryFile_erni",
 						"type": "PipelineReference"
 					},
 					"waitOnCompletion": true,
