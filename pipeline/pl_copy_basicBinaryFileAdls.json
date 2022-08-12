@@ -173,6 +173,8 @@
 		"folder": {
 			"name": "AMIS/4_Shared/Archiving"
 		},
-		"annotations": []
-	}
+		"annotations": [],
+		"lastPublishTime": "2022-08-12T09:05:43Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
 }

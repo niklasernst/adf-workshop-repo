@@ -1,5 +1,6 @@
 {
 	"name": "ls_http_anonymous",
+	"type": "Microsoft.DataFactory/factories/linkedservices",
 	"properties": {
 		"description": "This HTTP linked service takes the base URL as parameter and uses anonymous as authentication type.",
 		"parameters": {

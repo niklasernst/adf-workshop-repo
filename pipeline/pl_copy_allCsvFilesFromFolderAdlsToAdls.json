@@ -742,7 +742,7 @@
 			"name": "AMIS/2_Processing/CSV copy"
 		},
 		"annotations": [],
-		"lastPublishTime": "2022-04-13T10:07:16Z"
+		"lastPublishTime": "2022-08-12T09:05:44Z"
 	},
 	"type": "Microsoft.DataFactory/factories/pipelines"
 }
