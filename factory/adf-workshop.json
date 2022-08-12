@@ -29,6 +29,10 @@
 			"par_akvSasTokenUrlForWritingToQueue": {
 				"type": "string",
 				"value": "TODO"
+			},
+			"par_metadataStorageAccountName": {
+				"type": "string",
+				"value": "workshopmetadata"
 			}
 		}
 	},
