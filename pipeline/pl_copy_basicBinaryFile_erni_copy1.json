@@ -70,7 +70,7 @@
 						"type": "DatasetReference",
 						"parameters": {
 							"par_storageAccount": {
-								"value": "@pipeline().parameters.par_targetStorageAccount",
+								"value": "@concat(pipeline().parameters.par_targetStorageAccount,pipeline().globalParameters.par_environment)",
 								"type": "Expression"
 							},
 							"par_container": {
